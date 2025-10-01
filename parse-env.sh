@@ -3,7 +3,7 @@
 
 if [ -n "$NETWORK_DIR" ]
 then
-  echo "sourcing $scriptDir/$NETWORK_DIR/env.vars"
+  echo "setting up network from $scriptDir/$NETWORK_DIR"
   configDir="$scriptDir/$NETWORK_DIR/genesis"
   dataDir="$scriptDir/$NETWORK_DIR/data"
 else
@@ -43,6 +43,10 @@ while [[ $# -gt 0 ]]; do
       inTerminal=true
       shift # past argument
       ;;
+    --dockerWithSudo)
+      dockerWithSudo=true
+      shift # past argument
+      ;;
     *)    # unknown option
       shift # past argument
       ;;
@@ -64,9 +68,11 @@ fi;
 
 # ideally read config from validatorConfig and figure out all nodes in the array
 # if validatorConfig is genesis bootnode then we read the genesis/validator_config.yaml for this
+# please note that the clients are infered from the name of the nodes
 nodes=("zeam_0" "zeam_1")
-spin_nodes=()
 
+# collect the nodes that the user has asked us to spin
+spin_nodes=()
 for item in "${nodes[@]}"; do
   if [ $node == $item ] || [ $node == "all" ]
   then
