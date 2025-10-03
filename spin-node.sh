@@ -4,8 +4,15 @@
 currentDir=$(pwd)
 scriptDir=$(dirname $0)
 
-# 1. parse env and args
+# 0. parse env and args
 source "$(dirname $0)/parse-env.sh"
+
+#1. setup genesis params and run genesis generator
+source "$(dirname $0)/set-up.sh"
+#  TODO: run genesis generator
+# should take config.yaml and validator-config.yaml and generate files
+# 1. nodes.yaml 2. validators.yaml 3. .key files for each of nodes
+
 # 2. get the client cmds with args set
 source "$scriptDir/$NETWORK_DIR/client_env.sh"
 
@@ -23,11 +30,18 @@ then
   echo "invalid specified node, options =${nodes[@]} all, exiting."
   exit;
 fi;
-source "$(dirname $0)/set-up.sh"
 
 # 4. run clients
+mkdir $dataDir
 popupTerminal="gnome-terminal --disable-factory --"
 for item in "${spin_nodes[@]}"; do
+  # create and/or cleanup datadirs
+  itemDataDir="$dataDir/$item"
+  mkdir $itemDataDir
+  cmd="sudo rm -rf $itemDataDir/*"
+  echo $cmd
+  eval $cmd
+
   # extract client config
   IFS='_' read -r -a elements <<< "$item"
   client="${elements[0]}"
@@ -41,6 +55,7 @@ for item in "${spin_nodes[@]}"; do
   docker_var_name="${client}_DOCKER_REF"
   node_docker="${!docker_var_name}"
 
+  # spin nodes
   echo -e "\n\nspining $item: client=$client (mode=$node_setup)"
   printf '%*s' $(tput cols) | tr ' ' '-'
   echo
@@ -48,8 +63,8 @@ for item in "${spin_nodes[@]}"; do
   if [ "$node_setup" == "binary" ]
   then
     execCmd="$node_binary \
-      --data_dir $dataDir/$item \
-      --node_key $item"
+      --data-dir $dataDir/$item \
+      --node-id $item --node-key $configDir/$item.key"
   else
     execCmd="docker run --rm"
     if [ -n "$dockerWithSudo" ]
@@ -58,7 +73,7 @@ for item in "${spin_nodes[@]}"; do
     fi;
 
     execCmd="$execCmd --name $item --network host -v $configDir:/config -v $dataDir/$item:/data $node_docker \
-      --node_key $item"
+      --node-id $item --node-key /config/$item.key"
   fi;
 
   if [ ! -n "$inTerminal" ]
