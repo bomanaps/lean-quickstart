@@ -49,15 +49,41 @@ fi
 echo "Detected nodes: ${nodes[@]}"
 # nodes=("zeam_0" "ream_0" "qlean_0")
 spin_nodes=()
-for item in "${nodes[@]}"; do
-  if [ $node == $item ] || [ $node == "all" ]
-  then
-    node_present=true
-    spin_nodes+=($item)
-  fi;
-done
-if [ ! -n "$node_present" ] && [ node != "all" ]
-then
+
+# Parse comma-separated or space-separated node names or handle single node/all
+if [[ "$node" == "all" ]]; then
+  # Spin all nodes
+  spin_nodes=("${nodes[@]}")
+  node_present=true
+else
+  # Handle both comma-separated and space-separated node names
+  if [[ "$node" == *","* ]]; then
+    IFS=',' read -r -a requested_nodes <<< "$node"
+  else
+    IFS=' ' read -r -a requested_nodes <<< "$node"
+  fi
+
+  # Check each requested node against available nodes
+  for requested_node in "${requested_nodes[@]}"; do
+    node_found=false
+    for available_node in "${nodes[@]}"; do
+      if [[ "$requested_node" == "$available_node" ]]; then
+        spin_nodes+=("$available_node")
+        node_present=true
+        node_found=true
+        break
+      fi
+    done
+
+    if [[ "$node_found" == false ]]; then
+      echo "Error: Node '$requested_node' not found in validator config"
+      echo "Available nodes: ${nodes[@]}"
+      exit 1
+    fi
+  done
+fi
+
+if [ ! -n "$node_present" ]; then
   echo "invalid specified node, options =${nodes[@]} all, exiting."
   exit;
 fi;
