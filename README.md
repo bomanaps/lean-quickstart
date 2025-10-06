@@ -7,7 +7,9 @@ A single command line quickstart to spin up lean node(s)
 1. Shell terminal: Preferably linux especially if you want to pop out separate new terminals for node
 2. Genesis configuration
 3. Zeam Build (other clients to be supported soon)
-4. **yq**: YAML processor for automated configuration parsing
+4. **Docker**: Required to run PK's eth-beacon-genesis tool
+   - Install from: [Docker Desktop](https://docs.docker.com/get-docker/)
+5. **yq**: YAML processor for automated configuration parsing
    - Install on macOS: `brew install yq`
    - Install on Linux: See [yq installation guide](https://github.com/mikefarah/yq#install)
 
@@ -67,11 +69,16 @@ The quickstart includes an automated genesis generator that eliminates the need 
 
 ### How It Works
 
-The genesis generator (`generate-genesis.sh`) reads `config.yaml` and `validator-config.yaml` to automatically generate:
+The genesis generator (`generate-genesis.sh`) uses PK's official `eth-beacon-genesis` docker tool to automatically generate:
 
 1. **validators.yaml** - Validator index assignments using round-robin distribution
 2. **nodes.yaml** - ENR (Ethereum Node Records) for peer discovery
-3. **.key files** - Private key files for each node
+3. **genesis.json** - Genesis state in JSON format
+4. **genesis.ssz** - Genesis state in SSZ format
+5. **.key files** - Private key files for each node
+
+**Docker Image**: `ethpandaops/eth-beacon-genesis:pk910-leanchain`  
+**Source**: https://github.com/ethpandaops/eth-beacon-genesis/pull/36
 
 ### Usage
 
@@ -91,30 +98,32 @@ You can also run the generator standalone:
 
 ### Requirements
 
+- **Docker**: To run PK's eth-beacon-genesis tool
 - **yq**: YAML processor (already required)
-- **zeam-tools**: For ENR generation - build with `zig build tools -Doptimize=ReleaseFast`
+
+**No longer needed**: zeam-tools (PK's tool handles ENR generation)
 
 ### Benefits
 
+- ✅ **Official Tool**: Uses PK's `eth-beacon-genesis` docker tool (not custom tooling)
+- ✅ **Complete Genesis State**: Generates full genesis state (JSON + SSZ) plus config files
 - ✅ **No hardcoded files** - All genesis files are generated dynamically
 - ✅ **Single source of truth** - `validator-config.yaml` defines everything
 - ✅ **Easy to modify** - Add/remove nodes by editing `validator-config.yaml`
-- ✅ **Automatic ENR generation** - No manual ENR creation needed
-- ✅ **Flexible validator distribution** - Round-robin by default
+- ✅ **Standards compliant** - Uses ethpandaops maintained tool
 
 ## Automation Features
 
-This quickstart now includes automated configuration parsing:
+This quickstart includes automated configuration parsing:
 
-- **Genesis File Generation**: Automatically generates `validators.yaml`, `nodes.yaml`, and `.key` files
+- **Official Genesis Generation**: Uses PK's `eth-beacon-genesis` docker tool from [PR #36](https://github.com/ethpandaops/eth-beacon-genesis/pull/36)
+- **Complete File Set**: Generates `validators.yaml`, `nodes.yaml`, `genesis.json`, `genesis.ssz`, and `.key` files
 - **QUIC Port Detection**: Automatically extracts QUIC ports from `validator-config.yaml` using `yq`
 - **Node Detection**: Dynamically discovers available nodes from the validator configuration
 - **Private Key Management**: Automatically extracts and creates `.key` files for each node
-- **ENR Generation**: Automatically generates Ethereum Node Records for peer discovery
 - **Error Handling**: Provides clear error messages when nodes or ports are not found
-- **No Hardcoding**: Eliminates the need for manual configuration in scripts
 
-The system now reads all configuration from YAML files, making it easy to add new nodes or modify existing ones without changing any scripts.
+The system reads all configuration from YAML files, making it easy to add new nodes or modify existing ones without changing any scripts.
 
 ## Client branches
 

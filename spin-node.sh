@@ -12,9 +12,8 @@ source "$(dirname $0)/parse-env.sh"
 
 #1. setup genesis params and run genesis generator
 source "$(dirname $0)/set-up.sh"
-#  TODO: run genesis generator
-# should take config.yaml and validator-config.yaml and generate files
-# 1. nodes.yaml 2. validators.yaml 3. .key files for each of nodes
+# ✅ Genesis generator implemented using PK's eth-beacon-genesis tool
+# Generates: validators.yaml, nodes.yaml, genesis.json, genesis.ssz, and .key files
 
 # 2. collect the nodes that the user has asked us to spin and perform setup
 if [ "$validatorConfig" == "genesis_bootnode" ] || [ -z "$validatorConfig" ]; then

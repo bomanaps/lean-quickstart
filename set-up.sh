@@ -31,18 +31,3 @@ if [ -n "$generateGenesis" ] || [ ! -f "$configDir/validators.yaml" ] || [ ! -f 
   echo ""
 fi
 
-# ========================================
-# Step 2: Update genesis time if freshStart
-# ========================================
-if [ -n "$freshStart" ]
-then
-  echo "⏰ Updating genesis time..."
-  TIME_NOW="$(date +%s)"
-  GENESIS_TIME=$((TIME_NOW + 30))
-  
-  # Use yq for cross-platform compatibility
-  yq eval ".GENESIS_TIME = $GENESIS_TIME" -i "$configDir/config.yaml"
-  
-  echo "   ✅ Genesis time set to: $GENESIS_TIME"
-  echo ""
-fi;

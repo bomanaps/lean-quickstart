@@ -1,9 +1,14 @@
 #!/bin/bash
-# Genesis Generator for Lean Quickstart
-# Generates validators.yaml, nodes.yaml, and .key files from validator-config.yaml and config.yaml
-# This tool eliminates the need for hardcoded genesis files
+# Genesis Generator for Lean Quickstart (Using PK's eth-beacon-genesis Tool)
+# Uses PK's official docker image for leanchain genesis generation
+# PR: https://github.com/ethpandaops/eth-beacon-genesis/pull/36
 
 set -e
+
+# ========================================
+# Configuration
+# ========================================
+PK_DOCKER_IMAGE="ethpandaops/eth-beacon-genesis:pk910-leanchain"
 
 # ========================================
 # Usage and Help
@@ -12,8 +17,8 @@ show_usage() {
     cat << EOF
 Usage: $0 <genesis-directory>
 
-Generate genesis configuration files (validators.yaml, nodes.yaml, and .key files)
-from validator-config.yaml and config.yaml.
+Generate genesis configuration files using PK's eth-beacon-genesis tool.
+Generates: config.yaml, validators.yaml, nodes.yaml, genesis.json, genesis.ssz, and .key files
 
 Arguments:
   genesis-directory    Path to the genesis directory containing:
@@ -24,13 +29,19 @@ Example:
   $0 local-devnet/genesis
 
 Generated Files:
+  - config.yaml        Updated with correct VALIDATOR_COUNT
   - validators.yaml    Validator index assignments for each node
   - nodes.yaml         ENR (Ethereum Node Records) for peer discovery
+  - genesis.json       Genesis state in JSON format
+  - genesis.ssz        Genesis state in SSZ format
   - <node>.key         Private key files for each node
 
 Requirements:
+  - Docker (to run PK's eth-beacon-genesis tool)
   - yq: YAML processor (install: brew install yq)
-  - zeam-tools: For ENR generation (build: zig build tools -Doptimize=ReleaseFast)
+
+Docker Image: ethpandaops/eth-beacon-genesis:pk910-leanchain
+PR: https://github.com/ethpandaops/eth-beacon-genesis/pull/36
 
 EOF
 }
@@ -69,42 +80,13 @@ if ! command -v yq &> /dev/null; then
 fi
 echo "  ✅ yq found: $(which yq)"
 
-# Check for zeam-tools
-ZEAM_TOOLS=""
-
-# Priority 1: Check for ZEAM_TOOLS_PATH environment variable
-if [ -n "$ZEAM_TOOLS_PATH" ] && [ -f "$ZEAM_TOOLS_PATH" ]; then
-    ZEAM_TOOLS="$ZEAM_TOOLS_PATH"
-    echo "  ✅ zeam-tools found (via ZEAM_TOOLS_PATH): $ZEAM_TOOLS"
-else
-    # Priority 2: Try relative path from script location (for lean-quickstart inside zeam repo)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    ZEAM_TOOLS_RELATIVE="$SCRIPT_DIR/../zig-out/bin/zeam-tools"
-    
-    if [ -f "$ZEAM_TOOLS_RELATIVE" ]; then
-        ZEAM_TOOLS="$ZEAM_TOOLS_RELATIVE"
-        echo "  ✅ zeam-tools found (relative): $ZEAM_TOOLS"
-    # Priority 3: Check common zeam installation location
-    elif [ -f "/Users/mercynaps/zeam/zig-out/bin/zeam-tools" ]; then
-        ZEAM_TOOLS="/Users/mercynaps/zeam/zig-out/bin/zeam-tools"
-        echo "  ✅ zeam-tools found (common location): $ZEAM_TOOLS"
-    # Priority 4: Try to find in PATH
-    elif command -v zeam-tools &> /dev/null; then
-        ZEAM_TOOLS=$(which zeam-tools)
-        echo "  ✅ zeam-tools found in PATH: $ZEAM_TOOLS"
-    else
-        echo "❌ Error: zeam-tools is required for ENR generation"
-        echo "   Build it with: cd <zeam-repo> && zig build tools -Doptimize=ReleaseFast"
-        echo "   Or set ZEAM_TOOLS_PATH environment variable"
-        echo "   Or add zeam-tools to your PATH"
-        exit 1
-    fi
+# Check for docker
+if ! command -v docker &> /dev/null; then
+    echo "❌ Error: Docker is required but not installed"
+    echo "   Install from: https://docs.docker.com/get-docker/"
+    exit 1
 fi
-
-# Check for openssl (optional, for key generation)
-if ! command -v openssl &> /dev/null; then
-    echo "  ⚠️  Warning: openssl not found (needed only for new key generation)"
-fi
+echo "  ✅ docker found: $(which docker)"
 
 echo ""
 
@@ -134,74 +116,82 @@ echo "  ✅ validator-config.yaml found"
 echo ""
 
 # ========================================
-# Read Configuration
+# Step 1: Update Genesis Time
 # ========================================
-echo "📊 Reading configuration..."
+echo "⏰ Step 1: Updating genesis time..."
+TIME_NOW="$(date +%s)"
+GENESIS_TIME=$((TIME_NOW + 30))
 
-# Read validator count from config.yaml
-VALIDATOR_COUNT=$(yq eval '.VALIDATOR_COUNT' "$CONFIG_FILE")
-if [ "$VALIDATOR_COUNT" == "null" ] || [ -z "$VALIDATOR_COUNT" ]; then
-    echo "❌ Error: VALIDATOR_COUNT not found in $CONFIG_FILE"
+# Use yq for cross-platform compatibility
+yq eval ".GENESIS_TIME = $GENESIS_TIME" -i "$CONFIG_FILE"
+
+echo "   ✅ Genesis time set to: $GENESIS_TIME"
+echo ""
+
+# ========================================
+# Step 2: Run PK's Genesis Generator
+# ========================================
+echo "🔧 Step 2: Running PK's eth-beacon-genesis tool..."
+echo "   Docker image: $PK_DOCKER_IMAGE"
+echo "   Command: leanchain"
+echo ""
+
+# Convert to absolute path for docker volume mount
+GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
+PARENT_DIR_ABS="$(cd "$GENESIS_DIR/.." && pwd)"
+
+# Run PK's tool
+# Note: PK's tool expects parent directory as mount point
+echo "   Executing docker command..."
+
+docker run --rm \
+  -v "$PARENT_DIR_ABS:/data" \
+  "$PK_DOCKER_IMAGE" \
+  leanchain \
+  --config "/data/genesis/config.yaml" \
+  --mass-validators "/data/genesis/validator-config.yaml" \
+  --state-output "/data/genesis/genesis.ssz" \
+  --json-output "/data/genesis/genesis.json" \
+  --nodes-output "/data/genesis/nodes.yaml" \
+  --validators-output "/data/genesis/validators.yaml" \
+  --config-output "/data/genesis/config.yaml"
+
+if [ $? -ne 0 ]; then
+    echo ""
+    echo "❌ Error: PK's genesis generator failed!"
     exit 1
 fi
-echo "  Total validators: $VALIDATOR_COUNT"
 
-# Read shuffle strategy (default: roundrobin)
-SHUFFLE=$(yq eval '.shuffle' "$VALIDATOR_CONFIG_FILE")
-if [ "$SHUFFLE" == "null" ] || [ -z "$SHUFFLE" ]; then
-    SHUFFLE="roundrobin"
-fi
-echo "  Shuffle strategy: $SHUFFLE"
+echo ""
+echo "   ✅ PK's tool completed successfully"
+echo "   ✅ Generated: config.yaml (updated)"
+echo "   ✅ Generated: validators.yaml"
+echo "   ✅ Generated: nodes.yaml"
+echo "   ✅ Generated: genesis.json"
+echo "   ✅ Generated: genesis.ssz"
+echo ""
 
-# Extract all node names from validator-config.yaml
+# ========================================
+# Step 3: Generate Private Key Files
+# ========================================
+echo "🔑 Step 3: Generating private key files..."
+
+# Extract node names from validator-config.yaml
 NODE_NAMES=($(yq eval '.validators[].name' "$VALIDATOR_CONFIG_FILE"))
-NODE_COUNT=${#NODE_NAMES[@]}
 
-if [ $NODE_COUNT -eq 0 ]; then
+if [ ${#NODE_NAMES[@]} -eq 0 ]; then
     echo "❌ Error: No validators found in $VALIDATOR_CONFIG_FILE"
     exit 1
 fi
 
-echo "  Node count: $NODE_COUNT"
 echo "  Nodes: ${NODE_NAMES[@]}"
 
-# Validate that each node has required fields
-for node in "${NODE_NAMES[@]}"; do
-    # Check for privkey
-    privkey=$(yq eval ".validators[] | select(.name == \"$node\") | .privkey" "$VALIDATOR_CONFIG_FILE")
-    if [ "$privkey" == "null" ] || [ -z "$privkey" ]; then
-        echo "  ⚠️  Node $node: missing privkey (will need to generate)"
-    fi
-    
-    # Check for enrFields
-    ip=$(yq eval ".validators[] | select(.name == \"$node\") | .enrFields.ip" "$VALIDATOR_CONFIG_FILE")
-    quic=$(yq eval ".validators[] | select(.name == \"$node\") | .enrFields.quic" "$VALIDATOR_CONFIG_FILE")
-    
-    if [ "$ip" == "null" ] || [ -z "$ip" ]; then
-        echo "❌ Error: Node $node: missing enrFields.ip in $VALIDATOR_CONFIG_FILE"
-        exit 1
-    fi
-    
-    if [ "$quic" == "null" ] || [ -z "$quic" ]; then
-        echo "❌ Error: Node $node: missing enrFields.quic in $VALIDATOR_CONFIG_FILE"
-        exit 1
-    fi
-done
-
-echo ""
-
-# ========================================
-# Generate Private Key Files
-# ========================================
-echo "🔑 Generating private key files..."
-
 for node in "${NODE_NAMES[@]}"; do
     privkey=$(yq eval ".validators[] | select(.name == \"$node\") | .privkey" "$VALIDATOR_CONFIG_FILE")
     
     if [ "$privkey" == "null" ] || [ -z "$privkey" ]; then
-        echo "  ⚠️  Node $node: No privkey found, cannot generate key file"
-        echo "     Please add privkey to validator-config.yaml for node: $node"
-        exit 1
+        echo "  ⚠️  Node $node: No privkey found, skipping"
+        continue
     fi
     
     key_file="$GENESIS_DIR/$node.key"
@@ -212,78 +202,25 @@ done
 echo ""
 
 # ========================================
-# Generate ENRs and nodes.yaml
+# Step 4: Validate Generated Files
 # ========================================
-echo "🌐 Generating ENRs and nodes.yaml..."
+echo "✓ Step 4: Validating generated files..."
 
-NODES_YAML="$GENESIS_DIR/nodes.yaml"
-> "$NODES_YAML"  # Clear/create file
+required_files=("config.yaml" "validators.yaml" "nodes.yaml" "genesis.json" "genesis.ssz")
+all_good=true
 
-for node in "${NODE_NAMES[@]}"; do
-    privkey=$(yq eval ".validators[] | select(.name == \"$node\") | .privkey" "$VALIDATOR_CONFIG_FILE")
-    ip=$(yq eval ".validators[] | select(.name == \"$node\") | .enrFields.ip" "$VALIDATOR_CONFIG_FILE")
-    quic=$(yq eval ".validators[] | select(.name == \"$node\") | .enrFields.quic" "$VALIDATOR_CONFIG_FILE")
-    
-    # Generate ENR using zeam-tools
-    enr=$("$ZEAM_TOOLS" enrgen --sk "$privkey" --ip "$ip" --quic "$quic" 2>/dev/null)
-    
-    if [ $? -ne 0 ] || [ -z "$enr" ]; then
-        echo "  ❌ Failed to generate ENR for $node"
-        exit 1
+for file in "${required_files[@]}"; do
+    if [ -f "$GENESIS_DIR/$file" ]; then
+        echo "  ✅ $file exists"
+    else
+        echo "  ❌ $file is missing"
+        all_good=false
     fi
-    
-    echo "- $enr" >> "$NODES_YAML"
-    echo "  ✅ $node: ${enr:0:50}..."
 done
 
-echo ""
-
-# ========================================
-# Generate validators.yaml
-# ========================================
-echo "👥 Generating validators.yaml..."
-
-VALIDATORS_YAML="$GENESIS_DIR/validators.yaml"
-> "$VALIDATORS_YAML"  # Clear/create file
-
-if [ "$SHUFFLE" == "roundrobin" ]; then
-    # Round-robin distribution: distribute validators evenly across nodes
-    for node_idx in "${!NODE_NAMES[@]}"; do
-        node="${NODE_NAMES[$node_idx]}"
-        
-        # Get the count for this node (how many validator indices it should get)
-        node_count=$(yq eval ".validators[] | select(.name == \"$node\") | .count" "$VALIDATOR_CONFIG_FILE")
-        if [ "$node_count" == "null" ] || [ -z "$node_count" ]; then
-            node_count=1  # Default to 1 if not specified
-        fi
-        
-        echo "$node:" >> "$VALIDATORS_YAML"
-        
-        # Calculate validators for this node
-        validators_assigned=0
-        val_idx=$node_idx
-        
-        while [ $validators_assigned -lt $node_count ] && [ $val_idx -lt $VALIDATOR_COUNT ]; do
-            echo "  - $val_idx" >> "$VALIDATORS_YAML"
-            validators_assigned=$((validators_assigned + 1))
-            val_idx=$((val_idx + NODE_COUNT))
-        done
-        
-        # Build display array
-        validators_for_node=()
-        val_idx=$node_idx
-        validators_assigned=0
-        while [ $validators_assigned -lt $node_count ] && [ $val_idx -lt $VALIDATOR_COUNT ]; do
-            validators_for_node+=($val_idx)
-            validators_assigned=$((validators_assigned + 1))
-            val_idx=$((val_idx + NODE_COUNT))
-        done
-        
-        echo "  ✅ $node: [${validators_for_node[@]}]"
-    done
-else
-    echo "  ❌ Error: Unknown shuffle strategy: $SHUFFLE"
-    echo "     Currently only 'roundrobin' is supported"
+if [ "$all_good" = false ]; then
+    echo ""
+    echo "❌ Some required files are missing!"
     exit 1
 fi
 
@@ -295,13 +232,21 @@ echo ""
 echo "✅ Genesis generation complete!"
 echo ""
 echo "📄 Generated files:"
-echo "   $NODES_YAML"
-echo "   $VALIDATORS_YAML"
+echo "   $GENESIS_DIR/config.yaml (updated)"
+echo "   $GENESIS_DIR/validators.yaml"
+echo "   $GENESIS_DIR/nodes.yaml"
+echo "   $GENESIS_DIR/genesis.json"
+echo "   $GENESIS_DIR/genesis.ssz"
 for node in "${NODE_NAMES[@]}"; do
-    echo "   $GENESIS_DIR/$node.key"
+    if [ -f "$GENESIS_DIR/$node.key" ]; then
+        echo "   $GENESIS_DIR/$node.key"
+    fi
 done
 echo ""
 echo "🎯 Next steps:"
 echo "   Run your nodes with: NETWORK_DIR=local-devnet ./spin-node.sh --node all --freshStart"
 echo ""
-
+echo "ℹ️  Using PK's eth-beacon-genesis docker image:"
+echo "   Image: $PK_DOCKER_IMAGE"
+echo "   PR: https://github.com/ethpandaops/eth-beacon-genesis/pull/36"
+echo ""
