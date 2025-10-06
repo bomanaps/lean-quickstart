@@ -47,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       dockerWithSudo=true
       shift # past argument
       ;;
+    --generateGenesis)
+      generateGenesis=true
+      shift # past argument
+      ;;
     *)    # unknown option
       shift # past argument
       ;;
@@ -77,5 +81,6 @@ echo "configDir = $configDir"
 echo "dataDir = $dataDir"
 echo "spin_nodes(s) = ${spin_nodes[@]}"
 echo "freshStart = $freshStart"
+echo "generateGenesis = $generateGenesis"
 echo "cleanData = $cleanData"
 echo "popupTerminal = $popupTerminal"

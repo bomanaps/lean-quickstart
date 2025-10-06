@@ -52,18 +52,67 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --freshStart --popupTermin
    
    The client is provided this input so as to parse the correct node configuration to startup the node.
 5. `--validatorConfig` is the path to specify your nodes `validator-config.yaml`, `validators.yaml` (for which `--node` is still the node key to index) if your node is not a bootnode. 
+3. `--generateGenesis` force regeneration of genesis files (`validators.yaml`, `nodes.yaml`, and `.key` files) from `validator-config.yaml`
+4. `--popupTerminal` if you want to pop out new terminals to run the nodes, opens gnome terminals
+5. `--node` specify which node you want to run, use `all` to run all the nodes in a single go, otherwise you may specify which node you want to run from `validator_config.yaml`.
+  The client is provided this input so as to parse the correct node configuration to startup the node.
+6. `--validatorConfig` is the path to specify your nodes `validator_config.yaml`, `validators.yaml` (for which `--node` is still the node key to index) if your node is not a bootnode.
+>>>>>>> 9591164 (Integrate genesis generator to replace hardcoded configuration files)
   If unspecified it assumes value of `genesis_bootnode` which is to say that your node config is to be picked from `genesis` folder with `--node` as the node key index.
   This value is further provided to the client so that they can parse the correct config information.
+
+## Genesis Generator
+
+The quickstart includes an automated genesis generator that eliminates the need for hardcoded `validators.yaml` and `nodes.yaml` files.
+
+### How It Works
+
+The genesis generator (`generate-genesis.sh`) reads `config.yaml` and `validator-config.yaml` to automatically generate:
+
+1. **validators.yaml** - Validator index assignments using round-robin distribution
+2. **nodes.yaml** - ENR (Ethereum Node Records) for peer discovery
+3. **.key files** - Private key files for each node
+
+### Usage
+
+The genesis generator runs automatically when:
+- `validators.yaml` or `nodes.yaml` don't exist, OR
+- You use the `--generateGenesis` flag
+
+```sh
+# Force regenerate genesis files
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --freshStart --generateGenesis
+```
+
+You can also run the generator standalone:
+```sh
+./generate-genesis.sh local-devnet/genesis
+```
+
+### Requirements
+
+- **yq**: YAML processor (already required)
+- **zeam-tools**: For ENR generation - build with `zig build tools -Doptimize=ReleaseFast`
+
+### Benefits
+
+- ✅ **No hardcoded files** - All genesis files are generated dynamically
+- ✅ **Single source of truth** - `validator-config.yaml` defines everything
+- ✅ **Easy to modify** - Add/remove nodes by editing `validator-config.yaml`
+- ✅ **Automatic ENR generation** - No manual ENR creation needed
+- ✅ **Flexible validator distribution** - Round-robin by default
 
 ## Automation Features
 
 This quickstart now includes automated configuration parsing:
 
+- **Genesis File Generation**: Automatically generates `validators.yaml`, `nodes.yaml`, and `.key` files
 - **QUIC Port Detection**: Automatically extracts QUIC ports from `validator-config.yaml` using `yq`
 - **Node Detection**: Dynamically discovers available nodes from the validator configuration
 - **Private Key Management**: Automatically extracts and creates `.key` files for each node
+- **ENR Generation**: Automatically generates Ethereum Node Records for peer discovery
 - **Error Handling**: Provides clear error messages when nodes or ports are not found
-- **No Hardcoding**: Eliminates the need for manual port assignments in scripts
+- **No Hardcoding**: Eliminates the need for manual configuration in scripts
 
 The system now reads all configuration from YAML files, making it easy to add new nodes or modify existing ones without changing any scripts.
 
