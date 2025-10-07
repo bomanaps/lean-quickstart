@@ -12,9 +12,8 @@ source "$(dirname $0)/parse-env.sh"
 
 #1. setup genesis params and run genesis generator
 source "$(dirname $0)/set-up.sh"
-#  TODO: run genesis generator
-# should take config.yaml and validator-config.yaml and generate files
-# 1. nodes.yaml 2. validators.yaml 3. .key files for each of nodes
+# ✅ Genesis generator implemented using PK's eth-beacon-genesis tool
+# Generates: validators.yaml, nodes.yaml, genesis.json, genesis.ssz, and .key files
 
 # 2. collect the nodes that the user has asked us to spin and perform setup
 if [ "$validatorConfig" == "genesis_bootnode" ] || [ -z "$validatorConfig" ]; then
@@ -93,6 +92,10 @@ mkdir -p $dataDir
 popupTerminalCmd="gnome-terminal --disable-factory --"
 spinned_pids=()
 for item in "${spin_nodes[@]}"; do
+  echo -e "\n\nspining $item: client=$client (mode=$node_setup)"
+  printf '%*s' $(tput cols) | tr ' ' '-'
+  echo
+
   # create and/or cleanup datadirs
   itemDataDir="$dataDir/$item"
   mkdir -p $itemDataDir
@@ -113,11 +116,6 @@ for item in "${spin_nodes[@]}"; do
   eval $sourceCmd
 
   # spin nodes
-  echo -e "\n\nspining $item: client=$client (mode=$node_setup)"
-  printf '%*s' $(tput cols) | tr ' ' '-'
-  echo
-
-
   if [ "$node_setup" == "binary" ]
   then
     execCmd="$node_binary"
@@ -149,7 +147,9 @@ container_names="${spin_nodes[*]}"
 process_ids="${spinned_pids[*]}"
 
 cleanup() {
-  echo "cleaning up"
+  echo -e "\n\ncleaning up"
+  printf '%*s' $(tput cols) | tr ' ' '-'
+  echo
 
   # try for docker containers
   execCmd="docker rm -f $container_names"
@@ -167,7 +167,8 @@ cleanup() {
 }
 
 trap "echo exit signal received;cleanup" SIGINT SIGTERM
-echo "waiting for nodes to exit"
+echo -e "\n\nwaiting for nodes to exit"
+printf '%*s' $(tput cols) | tr ' ' '-'
 echo "press Ctrl+C to exit and cleanup..."
 wait -n $process_ids
 cleanup

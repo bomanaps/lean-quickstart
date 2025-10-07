@@ -1,12 +1,33 @@
 #!/bin/bash
 # set -e
 
-if [ -n "$freshStart" ]
-then
-  TIME_NOW="$(date +%s)"
-  GENESIS_TIME=$((TIME_NOW + 30))
-  sedPatten="/GENESIS_TIME/c\GENESIS_TIME: $GENESIS_TIME"
-  cmd="sed -i \"$sedPatten\" \"$configDir/config.yaml\""
-  echo $cmd
-  eval $cmd
-fi;
+# ========================================
+# Step 1: Generate genesis files if needed
+# ========================================
+# Run genesis generator if:
+# - --generateGenesis flag is set, OR
+# - validators.yaml doesn't exist, OR
+# - nodes.yaml doesn't exist
+if [ -n "$generateGenesis" ] || [ ! -f "$configDir/validators.yaml" ] || [ ! -f "$configDir/nodes.yaml" ]; then
+  echo ""
+  echo "🔧 Running genesis generator..."
+  echo "================================================"
+  
+  # Find the genesis generator script
+  genesis_generator="$scriptDir/generate-genesis.sh"
+  
+  if [ ! -f "$genesis_generator" ]; then
+    echo "❌ Error: Genesis generator not found at $genesis_generator"
+    exit 1
+  fi
+  
+  # Run the generator
+  if ! $genesis_generator "$configDir"; then
+    echo "❌ Genesis generation failed!"
+    exit 1
+  fi
+  
+  echo "================================================"
+  echo ""
+fi
+

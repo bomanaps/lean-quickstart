@@ -1,1 +1,6 @@
 data
+*.key
+*.backup
+*.old
+genesis.json
+genesis.ssz
