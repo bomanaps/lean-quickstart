@@ -27,8 +27,8 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --popupTerm
 # Run only zeam_0 and ream_0 nodes (comma-separated)
 NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0,ream_0 --generateGenesis --popupTerminal
 
-# Run only zeam_0 and ream_0 nodes (space-separated)
-NETWORK_DIR=local-devnet ./spin-node.sh --node "zeam_0 ream_0" --generateGenesis --popupTerminal
+# Run only zeam_0 and qlean_0 nodes (space-separated)
+NETWORK_DIR=local-devnet ./spin-node.sh --node "zeam_0 qlean_0" --generateGenesis --popupTerminal
 
 # Run only a single node
 NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --generateGenesis --popupTerminal
@@ -49,7 +49,7 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --generateGenesis --popupT
 4. `--node` specify which node(s) you want to run:
    - Use `all` to run all the nodes in a single go
    - Specify a single node name (e.g., `zeam_0`) to run just that node
-   - Use comma-separated node names (e.g., `zeam_0,ream_0`) to run multiple specific nodes
+   - Use comma-separated node names (e.g., `zeam_0,qlean_0`) to run multiple specific nodes
    - Use whitespace-separated node names (e.g., `"zeam_0 ream_0"`) to run multiple specific nodes
    
    The client is provided this input so as to parse the correct node configuration to startup the node.
@@ -65,6 +65,16 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --generateGenesis --popupT
 ## Genesis Generator
 
 The quickstart includes an automated genesis generator that eliminates the need for hardcoded `validators.yaml` and `nodes.yaml` files.
+
+### Clients supported
+
+Current following clients are supported:
+
+1. Zeam
+2. Ream
+3. Qlean
+
+However adding a lean client to this setup is very easy. Feel free to do the PR or reach out to the maintainers.
 
 ### How It Works
 

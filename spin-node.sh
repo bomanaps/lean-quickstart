@@ -92,6 +92,10 @@ mkdir -p $dataDir
 popupTerminalCmd="gnome-terminal --disable-factory --"
 spinned_pids=()
 for item in "${spin_nodes[@]}"; do
+  echo -e "\n\nspining $item: client=$client (mode=$node_setup)"
+  printf '%*s' $(tput cols) | tr ' ' '-'
+  echo
+
   # create and/or cleanup datadirs
   itemDataDir="$dataDir/$item"
   mkdir -p $itemDataDir
@@ -112,11 +116,6 @@ for item in "${spin_nodes[@]}"; do
   eval $sourceCmd
 
   # spin nodes
-  echo -e "\n\nspining $item: client=$client (mode=$node_setup)"
-  printf '%*s' $(tput cols) | tr ' ' '-'
-  echo
-
-
   if [ "$node_setup" == "binary" ]
   then
     execCmd="$node_binary"
@@ -148,7 +147,9 @@ container_names="${spin_nodes[*]}"
 process_ids="${spinned_pids[*]}"
 
 cleanup() {
-  echo "cleaning up"
+  echo -e "\n\ncleaning up"
+  printf '%*s' $(tput cols) | tr ' ' '-'
+  echo
 
   # try for docker containers
   execCmd="docker rm -f $container_names"
@@ -166,7 +167,8 @@ cleanup() {
 }
 
 trap "echo exit signal received;cleanup" SIGINT SIGTERM
-echo "waiting for nodes to exit"
+echo -e "\n\nwaiting for nodes to exit"
+printf '%*s' $(tput cols) | tr ' ' '-'
 echo "press Ctrl+C to exit and cleanup..."
 wait -n $process_ids
 cleanup
