@@ -31,10 +31,6 @@ while [[ $# -gt 0 ]]; do
       shift # past argument
       shift # past value
       ;;
-    --freshStart)
-      freshStart=true
-      shift # past argument
-      ;;
     --cleanData)
       cleanData=true
       shift # past argument
@@ -49,6 +45,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --generateGenesis)
       generateGenesis=true
+      cleanData=true  # generateGenesis implies clean data
       shift # past argument
       ;;
     *)    # unknown option
@@ -70,17 +67,12 @@ then
   validatorConfig="genesis_bootnode"
 fi;
 
-if [ -n "$freshStart" ]
-then
-  echo "starting from a fresh genesis time..."
-  cleanData=true
-fi;
+# freshStart logic removed - now handled by --generateGenesis flag
 
 
 echo "configDir = $configDir"
 echo "dataDir = $dataDir"
 echo "spin_nodes(s) = ${spin_nodes[@]}"
-echo "freshStart = $freshStart"
 echo "generateGenesis = $generateGenesis"
 echo "cleanData = $cleanData"
 echo "popupTerminal = $popupTerminal"

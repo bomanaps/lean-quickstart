@@ -18,20 +18,20 @@ A single command line quickstart to spin up lean node(s)
 ### Quickly startup various nodes as a local devnet
 
 ```sh
-NETWORK_DIR=local-devnet ./spin-node.sh --node all --freshStart --popupTerminal
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --popupTerminal
 ```
 
 ### Startup specific nodes only
 
 ```sh
 # Run only zeam_0 and ream_0 nodes (comma-separated)
-NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0,ream_0 --freshStart --popupTerminal
+NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0,ream_0 --generateGenesis --popupTerminal
 
 # Run only zeam_0 and ream_0 nodes (space-separated)
-NETWORK_DIR=local-devnet ./spin-node.sh --node "zeam_0 ream_0" --freshStart --popupTerminal
+NETWORK_DIR=local-devnet ./spin-node.sh --node "zeam_0 ream_0" --generateGenesis --popupTerminal
 
 # Run only a single node
-NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --freshStart --popupTerminal
+NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --generateGenesis --popupTerminal
 ```
   
 ## Args
@@ -44,7 +44,7 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --freshStart --popupTermin
     c. `nodes.yaml` which has the enrs generated for each of the respective nodes.
     d. `config.yaml` the actual network config
 
-2. `--freshStart` reset the genesis time in the `config.yaml` to now
+2. `--generateGenesis` regenerate all genesis files with fresh genesis time and clean data directories
 3. `--popupTerminal` if you want to pop out new terminals to run the nodes, opens gnome terminals
 4. `--node` specify which node(s) you want to run:
    - Use `all` to run all the nodes in a single go
@@ -59,7 +59,6 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --freshStart --popupTermin
 5. `--node` specify which node you want to run, use `all` to run all the nodes in a single go, otherwise you may specify which node you want to run from `validator_config.yaml`.
   The client is provided this input so as to parse the correct node configuration to startup the node.
 6. `--validatorConfig` is the path to specify your nodes `validator_config.yaml`, `validators.yaml` (for which `--node` is still the node key to index) if your node is not a bootnode.
->>>>>>> 9591164 (Integrate genesis generator to replace hardcoded configuration files)
   If unspecified it assumes value of `genesis_bootnode` which is to say that your node config is to be picked from `genesis` folder with `--node` as the node key index.
   This value is further provided to the client so that they can parse the correct config information.
 
@@ -87,8 +86,8 @@ The genesis generator runs automatically when:
 - You use the `--generateGenesis` flag
 
 ```sh
-# Force regenerate genesis files
-NETWORK_DIR=local-devnet ./spin-node.sh --node all --freshStart --generateGenesis
+# Regenerate genesis files with fresh genesis time
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis
 ```
 
 You can also run the generator standalone:

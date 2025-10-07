@@ -244,7 +244,7 @@ for node in "${NODE_NAMES[@]}"; do
 done
 echo ""
 echo "🎯 Next steps:"
-echo "   Run your nodes with: NETWORK_DIR=local-devnet ./spin-node.sh --node all --freshStart"
+echo "   Run your nodes with: NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis"
 echo ""
 echo "ℹ️  Using PK's eth-beacon-genesis docker image:"
 echo "   Image: $PK_DOCKER_IMAGE"
