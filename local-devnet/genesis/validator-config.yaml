@@ -8,6 +8,7 @@ validators:
       # verify /ip4/127.0.0.1/udp/9000/quic-v1/p2p/16Uiu2HAkvi2sxT75Bpq1c7yV2FjnSQJJ432d6jeshbmfdJss1i6f
       ip: "127.0.0.1"
       quic: 9000
+    metricsPort: 8080
     count: 1 # number of indices for this node
 
   - name: "ream_0"
@@ -18,6 +19,7 @@ validators:
       #verify /ip4/127.0.0.1/udp/9001/quic-v1/p2p/16Uiu2HAmPQhkD6Zg5Co2ee8ShshkiY4tDePKFARPpCS2oKSLj1E1
       ip: "127.0.0.1"
       quic: 9001
+    metricsPort: 8081
     count: 1
 
   - name: "qlean_0"
@@ -27,4 +29,5 @@ validators:
       #verify /ip4/127.0.0.1/udp/9001/quic-v1/p2p/16Uiu2HAmPQhkD6Zg5Co2ee8ShshkiY4tDePKFARPpCS2oKSLj1E1
       ip: "127.0.0.1"
       quic: 9002
+    metricsPort: 8082
     count: 1
