@@ -8,7 +8,8 @@ node_docker="ghcr.io/reamlabs/ream:latest --data-dir /data \
         --validator-registry-path /config/validators.yaml \
         --bootnodes /config/nodes.yaml \
         --node-id $item --node-key /config/$privKeyPath \
-        --socket-port $quicPort"
+        --socket-port $quicPort \
+        --metrics-port $metricsPort"
 
 # choose either binary or docker
 node_setup="docker"

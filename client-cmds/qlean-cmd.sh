@@ -10,7 +10,8 @@ node_binary="$scriptDir/qlean/build/src/executable/qlean \
       --bootnodes $configDir/nodes.yaml \
       --data-dir $dataDir/$item \
       --node-id $item --node-key $configDir/$privKeyPath \
-      --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1"
+      --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1 \
+      --metrics-port $metricsPort"
 
 node_docker="--platform linux/amd64 qdrvm/qlean-mini:dd67521 \
       --genesis /config/config.yaml \
@@ -18,7 +19,8 @@ node_docker="--platform linux/amd64 qdrvm/qlean-mini:dd67521 \
       --bootnodes /config/nodes.yaml \
       --data-dir /data \
       --node-id $item --node-key /config/$privKeyPath \
-      --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1"
+      --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1 \
+      --metrics-port $metricsPort"
 
 # choose either binary or docker
 node_setup="docker"

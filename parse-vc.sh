@@ -33,6 +33,17 @@ if [ -z "$quicPort" ] || [ "$quicPort" == "null" ]; then
     exit 1
 fi
 
+# Automatically extract metrics port using yq
+metricsPort=$(yq eval ".validators[] | select(.name == \"$item\") | .metricsPort" "$validator_config_file")
+
+# Validate that we found a metrics port for this node
+if [ -z "$metricsPort" ] || [ "$metricsPort" == "null" ]; then
+    echo "Error: No metrics port found for node '$item' in $validator_config_file"
+    echo "Available nodes:"
+    yq eval '.validators[].name' "$validator_config_file"
+    exit 1
+fi
+
 # Automatically extract private key using yq
 privKey=$(yq eval ".validators[] | select(.name == \"$item\") | .privkey" "$validator_config_file")
 
@@ -48,4 +59,5 @@ echo "$privKey" > "$configDir/$privKeyPath"
 
 echo "Node: $item"
 echo "QUIC Port: $quicPort"
+echo "Metrics Port: $metricsPort"
 echo "Private Key File: $privKeyPath"
