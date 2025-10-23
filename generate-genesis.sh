@@ -22,19 +22,25 @@ Generates: config.yaml, validators.yaml, nodes.yaml, genesis.json, genesis.ssz, 
 
 Arguments:
   genesis-directory    Path to the genesis directory containing:
-                       - config.yaml (with GENESIS_TIME and VALIDATOR_COUNT)
-                       - validator-config.yaml (with node configurations)
+                       - config.yaml (with GENESIS_TIME)
+                       - validator-config.yaml (with node configurations and individual counts)
 
 Example:
   $0 local-devnet/genesis
 
 Generated Files:
-  - config.yaml        Updated with correct VALIDATOR_COUNT
+  - config.yaml        Updated with GENESIS_TIME and auto-calculated VALIDATOR_COUNT
   - validators.yaml    Validator index assignments for each node
   - nodes.yaml         ENR (Ethereum Node Records) for peer discovery
   - genesis.json       Genesis state in JSON format
   - genesis.ssz        Genesis state in SSZ format
   - <node>.key         Private key files for each node
+
+How It Works:
+  1. Reads individual validator 'count' fields from validator-config.yaml
+  2. Automatically sums them to calculate total VALIDATOR_COUNT
+  3. Updates config.yaml with the calculated total (no manual syncing needed)
+  4. Runs PK's genesis generator with correct validator count
 
 Requirements:
   - Docker (to run PK's eth-beacon-genesis tool)
@@ -126,6 +132,42 @@ GENESIS_TIME=$((TIME_NOW + 30))
 yq eval ".GENESIS_TIME = $GENESIS_TIME" -i "$CONFIG_FILE"
 
 echo "   ✅ Genesis time set to: $GENESIS_TIME"
+echo ""
+
+# ========================================
+# Step 1.5: Auto-Update Validator Count
+# ========================================
+echo "🔢 Step 1.5: Calculating total validator count..."
+
+# Sum all individual validator counts from validator-config.yaml
+TOTAL_VALIDATORS=$(yq eval '.validators[].count' "$VALIDATOR_CONFIG_FILE" | awk '{sum+=$1} END {print sum}')
+
+# Validate the sum
+if [ -z "$TOTAL_VALIDATORS" ] || [ "$TOTAL_VALIDATORS" == "null" ]; then
+    echo "❌ Error: Could not calculate total validator count from $VALIDATOR_CONFIG_FILE"
+    echo "   Make sure each validator has a 'count' field defined"
+    exit 1
+fi
+
+if [ "$TOTAL_VALIDATORS" -eq 0 ]; then
+    echo "❌ Error: Total validator count is 0"
+    echo "   Check that validator count values are greater than 0 in $VALIDATOR_CONFIG_FILE"
+    exit 1
+fi
+
+# Display individual validator counts for transparency
+echo "   Individual validator counts:"
+while IFS= read -r line; do
+    validator_name=$(echo "$line" | cut -d: -f1)
+    validator_count=$(echo "$line" | cut -d: -f2 | xargs)
+    echo "     - $validator_name: $validator_count"
+done < <(yq eval '.validators[] | .name + ":" + (.count | tostring)' "$VALIDATOR_CONFIG_FILE")
+
+# Update config.yaml with the calculated total
+yq eval ".VALIDATOR_COUNT = $TOTAL_VALIDATORS" -i "$CONFIG_FILE"
+
+echo "   ✅ Total validator count: $TOTAL_VALIDATORS"
+echo "   ✅ Updated VALIDATOR_COUNT in config.yaml"
 echo ""
 
 # ========================================
