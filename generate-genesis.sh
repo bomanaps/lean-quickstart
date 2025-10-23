@@ -22,14 +22,13 @@ Generates: config.yaml, validators.yaml, nodes.yaml, genesis.json, genesis.ssz, 
 
 Arguments:
   genesis-directory    Path to the genesis directory containing:
-                       - config.yaml (with GENESIS_TIME)
                        - validator-config.yaml (with node configurations and individual counts)
 
 Example:
   $0 local-devnet/genesis
 
 Generated Files:
-  - config.yaml        Updated with GENESIS_TIME and auto-calculated VALIDATOR_COUNT
+  - config.yaml        Auto-generated with GENESIS_TIME and VALIDATOR_COUNT
   - validators.yaml    Validator index assignments for each node
   - nodes.yaml         ENR (Ethereum Node Records) for peer discovery
   - genesis.json       Genesis state in JSON format
@@ -37,10 +36,13 @@ Generated Files:
   - <node>.key         Private key files for each node
 
 How It Works:
-  1. Reads individual validator 'count' fields from validator-config.yaml
-  2. Automatically sums them to calculate total VALIDATOR_COUNT
-  3. Updates config.yaml with the calculated total (no manual syncing needed)
-  4. Runs PK's genesis generator with correct validator count
+  1. Calculates GENESIS_TIME (current time + 30 seconds)
+  2. Reads individual validator 'count' fields from validator-config.yaml
+  3. Automatically sums them to calculate total VALIDATOR_COUNT
+  4. Generates config.yaml from scratch with calculated values
+  5. Runs PK's genesis generator with correct parameters
+
+Note: config.yaml is a generated file - only edit validator-config.yaml
 
 Requirements:
   - Docker (to run PK's eth-beacon-genesis tool)
@@ -107,12 +109,6 @@ if [ ! -d "$GENESIS_DIR" ]; then
 fi
 echo "  ✅ Genesis directory: $GENESIS_DIR"
 
-if [ ! -f "$CONFIG_FILE" ]; then
-    echo "❌ Error: config.yaml not found at $CONFIG_FILE"
-    exit 1
-fi
-echo "  ✅ config.yaml found"
-
 if [ ! -f "$VALIDATOR_CONFIG_FILE" ]; then
     echo "❌ Error: validator-config.yaml not found at $VALIDATOR_CONFIG_FILE"
     exit 1
@@ -122,22 +118,14 @@ echo "  ✅ validator-config.yaml found"
 echo ""
 
 # ========================================
-# Step 1: Update Genesis Time
+# Step 1: Generate config.yaml
 # ========================================
-echo "⏰ Step 1: Updating genesis time..."
+echo "🔧 Step 1: Generating config.yaml..."
+
+# Calculate genesis time (30 seconds from now)
 TIME_NOW="$(date +%s)"
 GENESIS_TIME=$((TIME_NOW + 30))
-
-# Use yq for cross-platform compatibility
-yq eval ".GENESIS_TIME = $GENESIS_TIME" -i "$CONFIG_FILE"
-
-echo "   ✅ Genesis time set to: $GENESIS_TIME"
-echo ""
-
-# ========================================
-# Step 1.5: Auto-Update Validator Count
-# ========================================
-echo "🔢 Step 1.5: Calculating total validator count..."
+echo "   Genesis time: $GENESIS_TIME"
 
 # Sum all individual validator counts from validator-config.yaml
 TOTAL_VALIDATORS=$(yq eval '.validators[].count' "$VALIDATOR_CONFIG_FILE" | awk '{sum+=$1} END {print sum}')
@@ -163,11 +151,17 @@ while IFS= read -r line; do
     echo "     - $validator_name: $validator_count"
 done < <(yq eval '.validators[] | .name + ":" + (.count | tostring)' "$VALIDATOR_CONFIG_FILE")
 
-# Update config.yaml with the calculated total
-yq eval ".VALIDATOR_COUNT = $TOTAL_VALIDATORS" -i "$CONFIG_FILE"
+echo "   Total validator count: $TOTAL_VALIDATORS"
 
-echo "   ✅ Total validator count: $TOTAL_VALIDATORS"
-echo "   ✅ Updated VALIDATOR_COUNT in config.yaml"
+# Generate config.yaml from scratch
+cat > "$CONFIG_FILE" << EOF
+# Genesis Settings
+GENESIS_TIME: $GENESIS_TIME
+# Validator Settings  
+VALIDATOR_COUNT: $TOTAL_VALIDATORS
+EOF
+
+echo "   ✅ Generated config.yaml"
 echo ""
 
 # ========================================
