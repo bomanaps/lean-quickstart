@@ -23,6 +23,7 @@ Generates: config.yaml, validators.yaml, nodes.yaml, genesis.json, genesis.ssz, 
 Arguments:
   genesis-directory    Path to the genesis directory containing:
                        - validator-config.yaml (with node configurations and individual counts)
+                       - validator-config.yaml must include key: shuffle.activeEpoch (positive integer)
 
 Example:
   $0 local-devnet/genesis
@@ -38,9 +39,10 @@ Generated Files:
 How It Works:
   1. Calculates GENESIS_TIME (current time + 30 seconds)
   2. Reads individual validator 'count' fields from validator-config.yaml
-  3. Automatically sums them to calculate total VALIDATOR_COUNT
-  4. Generates config.yaml from scratch with calculated values
-  5. Runs PK's genesis generator with correct parameters
+  3. Reads shuffle.activeEpoch from validator-config.yaml (required)
+  4. Automatically sums them to calculate total VALIDATOR_COUNT
+  5. Generates config.yaml from scratch with calculated values
+  6. Runs PK's genesis generator with correct parameters
 
 Note: config.yaml is a generated file - only edit validator-config.yaml
 
@@ -143,9 +145,20 @@ echo "   Using scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
 echo "   Key directory: $HASH_SIG_KEYS_DIR"
 echo ""
 
+# Read required active epoch exponent from validator-config.yaml
+ACTIVE_EPOCH=$(yq eval '.shuffle.activeEpoch' "$VALIDATOR_CONFIG_FILE" 2>/dev/null)
+if [ "$ACTIVE_EPOCH" == "null" ] || [ -z "$ACTIVE_EPOCH" ]; then
+    echo "❌ Error: validator-config.yaml missing valid key shuffle.activeEpoch (positive integer required)" >&2
+    exit 1
+fi
+if ! [[ "$ACTIVE_EPOCH" =~ ^[0-9]+$ ]] || [ "$ACTIVE_EPOCH" -le 0 ]; then
+    echo "❌ Error: validator-config.yaml missing valid key shuffle.activeEpoch (positive integer required)" >&2
+    exit 1
+fi
+
 # Generate hash-sig keys for all validators using Docker
 # Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8
-# Active epochs: 2^18 (262,144)
+# Active epochs: 2^ACTIVE_EPOCH (from validator-config.yaml)
 # Total lifetime: 2^32 (4,294,967,296)
 # Convert to absolute path for Docker volume mounting
 GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
@@ -155,7 +168,7 @@ docker run --rm \
   "$HASH_SIG_CLI_IMAGE" \
   generate \
   --num-validators "$VALIDATOR_COUNT" \
-  --log-num-active-epochs 18 \
+  --log-num-active-epochs "$ACTIVE_EPOCH" \
   --output-dir "/genesis/hash-sig-keys"
 
 if [ $? -ne 0 ]; then
@@ -351,6 +364,6 @@ echo ""
 echo "ℹ️  Hash-sig keys generated with:"
 echo "   Docker Image: $HASH_SIG_CLI_IMAGE"
 echo "   Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
-echo "   Active Epochs: 2^18 (262,144)"
+echo "   Active Epochs: 2^$ACTIVE_EPOCH"
 echo "   Total Lifetime: 2^32 (4,294,967,296)"
 echo ""
