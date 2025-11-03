@@ -96,35 +96,9 @@ if ! command -v docker &> /dev/null; then
 fi
 echo "  ✅ docker found: $(which docker)"
 
-# Check for hash-sig-cli tool
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-HASHSIG_CLI_DIR="$SCRIPT_DIR/tools/hash-sig-cli"
-HASH_SIG_CLI="$HASHSIG_CLI_DIR/target/release/hashsig"
-
-# Check if hash-sig submodule exists
-if [ ! -d "$HASHSIG_CLI_DIR" ]; then
-    echo "❌ Error: hash-sig-cli submodule not found at $HASHSIG_CLI_DIR"
-    echo "   Please initialize the submodule:"
-    echo "   git submodule update --init --recursive"
-    exit 1
-fi
-
-# Check if binary is built, build if needed
-if [ ! -f "$HASH_SIG_CLI" ]; then
-    echo "  ⚠️  hash-sig-cli binary not found"
-    echo "  📦 Building hash-sig-cli from source..."
-    
-    (cd "$HASHSIG_CLI_DIR" && cargo build --release)
-    
-    if [ ! -f "$HASH_SIG_CLI" ]; then
-        echo "  ❌ Error: Failed to build hash-sig-cli"
-        echo "     Make sure Rust/Cargo is installed: https://rustup.rs/"
-        exit 1
-    fi
-    
-    echo "  ✅ Successfully built hash-sig-cli"
-fi
-echo "  ✅ hash-sig-cli found: $HASH_SIG_CLI"
+# Hash-sig-cli Docker image
+HASH_SIG_CLI_IMAGE="blockblaz/hash-sig-cli:latest"
+echo "  ✅ Using hash-sig-cli Docker image: $HASH_SIG_CLI_IMAGE"
 
 echo ""
 
@@ -169,14 +143,20 @@ echo "   Using scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
 echo "   Key directory: $HASH_SIG_KEYS_DIR"
 echo ""
 
-# Generate hash-sig keys for all validators using genesis-specific command
+# Generate hash-sig keys for all validators using Docker
 # Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8
 # Active epochs: 2^18 (262,144)
 # Total lifetime: 2^32 (4,294,967,296)
-"$HASH_SIG_CLI" generate-for-genesis \
-    --num-validators "$VALIDATOR_COUNT" \
-    --log-num-active-epochs 18 \
-    --output-dir "$HASH_SIG_KEYS_DIR"
+# Convert to absolute path for Docker volume mounting
+GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
+
+docker run --rm \
+  -v "$GENESIS_DIR_ABS:/genesis" \
+  "$HASH_SIG_CLI_IMAGE" \
+  generate \
+  --num-validators "$VALIDATOR_COUNT" \
+  --log-num-active-epochs 18 \
+  --output-dir "/genesis/hash-sig-keys"
 
 if [ $? -ne 0 ]; then
     echo "   ❌ Failed to generate hash-sig keys"
@@ -369,6 +349,7 @@ echo "   Image: $PK_DOCKER_IMAGE"
 echo "   PR: https://github.com/ethpandaops/eth-beacon-genesis/pull/36"
 echo ""
 echo "ℹ️  Hash-sig keys generated with:"
+echo "   Docker Image: $HASH_SIG_CLI_IMAGE"
 echo "   Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
 echo "   Active Epochs: 2^18 (262,144)"
 echo "   Total Lifetime: 2^32 (4,294,967,296)"

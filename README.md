@@ -16,13 +16,11 @@ A single command line quickstart to spin up lean node(s)
 1. Shell terminal: Preferably linux especially if you want to pop out separate new terminals for node
 2. Genesis configuration
 3. Zeam Build (other clients to be supported soon)
-4. **Docker**: Required to run PK's eth-beacon-genesis tool
+4. **Docker**: Required to run PK's eth-beacon-genesis tool and hash-sig-cli for post-quantum keys
    - Install from: [Docker Desktop](https://docs.docker.com/get-docker/)
 5. **yq**: YAML processor for automated configuration parsing
    - Install on macOS: `brew install yq`
    - Install on Linux: See [yq installation guide](https://github.com/mikefarah/yq#install)
-6. **Rust/Cargo**: Required to build the hash-sig-cli tool for post-quantum keys
-   - Install from: [https://rustup.rs/](https://rustup.rs/)
 
 ## Quick Start
 
@@ -32,10 +30,7 @@ A single command line quickstart to spin up lean node(s)
 git clone <repo-url>
 cd lean-quickstart
 
-# 2. Initialize hash-sig-cli submodule
-git submodule update --init --recursive
-
-# 3. **Run** genesis generation:
+# 2. **Run** genesis generation:
 ./generate-genesis.sh local-devnet/genesis
 ```
 
@@ -133,7 +128,7 @@ This quickstart includes integrated support for **post-quantum secure hash-based
 ### How It Works
 
 The genesis generator automatically:
-1. **Builds hash-sig-cli** (if not already built) from the submodule
+1. **Uses Docker image** `blockblaz/hash-sig-cli:latest` to generate hash-sig keys
 2. **Generates hash-sig keys** for N validators (Step 1 of genesis generation)
 3. **Stores keys** in `genesis/hash-sig-keys/` directory
 4. **Loads keys** automatically when nodes start via environment variables
@@ -258,34 +253,6 @@ validators:
 ```
 
 ### Troubleshooting
-
-**Problem**: `hash-sig-cli submodule not found`
-```
-❌ Error: hash-sig-cli submodule not found at tools/hash-sig-cli
-```
-
-**Solution**: Initialize the git submodule:
-```sh
-git submodule update --init --recursive
-```
-
----
-
-**Problem**: `Failed to build hash-sig-cli`
-```
-❌ Error: Failed to build hash-sig-cli
-```
-
-**Solution**: Make sure Rust/Cargo is installed:
-```sh
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# Then run genesis generation again
-./generate-genesis.sh local-devnet/genesis
-```
-
----
 
 **Problem**: Hash-sig keys not loading during node startup
 ```
