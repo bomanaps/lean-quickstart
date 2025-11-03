@@ -1,3 +1,0 @@
-[submodule "tools/hash-sig-cli"]
-	path = tools/hash-sig-cli
-	url = https://github.com/blockblaz/hash-sig-cli.git
