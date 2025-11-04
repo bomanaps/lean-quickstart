@@ -29,7 +29,7 @@ Example:
   $0 local-devnet/genesis
 
 Generated Files:
-  - config.yaml        Auto-generated with GENESIS_TIME and VALIDATOR_COUNT
+  - config.yaml        Auto-generated with GENESIS_TIME, VALIDATOR_COUNT, and shuffle.activeEpoch
   - validators.yaml    Validator index assignments for each node
   - nodes.yaml         ENR (Ethereum Node Records) for peer discovery
   - genesis.json       Genesis state in JSON format
@@ -41,7 +41,7 @@ How It Works:
   2. Reads individual validator 'count' fields from validator-config.yaml
   3. Reads shuffle.activeEpoch from validator-config.yaml (required)
   4. Automatically sums them to calculate total VALIDATOR_COUNT
-  5. Generates config.yaml from scratch with calculated values
+  5. Generates config.yaml from scratch with calculated values including shuffle.activeEpoch
   6. Runs PK's genesis generator with correct parameters
 
 Note: config.yaml is a generated file - only edit validator-config.yaml
@@ -228,6 +228,11 @@ cat > "$CONFIG_FILE" << EOF
 GENESIS_TIME: $GENESIS_TIME
 # Validator Settings  
 VALIDATOR_COUNT: $TOTAL_VALIDATORS
+# Shuffle Settings
+shuffle: roundrobin
+
+config:
+  activeEpoch: $ACTIVE_EPOCH
 EOF
 
 echo "   ✅ Generated config.yaml"

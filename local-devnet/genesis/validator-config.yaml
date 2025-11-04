@@ -1,4 +1,5 @@
 shuffle:
+  type: roundrobin
   activeEpoch: 18
 validators:
   - name: "zeam_0"
