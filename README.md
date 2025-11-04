@@ -163,9 +163,12 @@ The system uses the **SIGTopLevelTargetSumLifetime32Dim64Base8** hash-based sign
 
 ### Configuration
 
-Each validator in `validator-config.yaml` must specify its hash-sig configuration:
+The `validator-config.yaml` file defines the shuffle algorithm, active epoch configuration, and validator specifications:
 
 ```yaml
+shuffle: roundrobin
+config:
+  activeEpoch: 18              # Required: Exponent for active epochs (2^18 = 262,144 signatures)
 validators:
   - name: "zeam_0"
     privkey: "bdf953adc161873ba026330c56450453f582e3c4ee6cb713644794bcfdd85fe5"
@@ -178,7 +181,11 @@ validators:
     count: 1
 ```
 
-**Key Fields:**
+**Required Top-Level Fields:**
+- `shuffle`: Validator shuffle algorithm (e.g., `roundrobin`)
+- `config.activeEpoch`: Exponent for active epochs used in hash-sig key generation (2^activeEpoch signatures per active period)
+
+**Validator Fields:**
 - `keyType`: Must be set to `"hash-sig"` for post-quantum keys
 - `hashSigKeyIndex`: Index number mapping to `validator_{index}_pk.json` and `validator_{index}_sk.json`
 

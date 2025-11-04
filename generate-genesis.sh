@@ -29,7 +29,7 @@ Example:
   $0 local-devnet/genesis
 
 Generated Files:
-  - config.yaml        Auto-generated with GENESIS_TIME, VALIDATOR_COUNT, and shuffle.activeEpoch
+  - config.yaml        Auto-generated with GENESIS_TIME, VALIDATOR_COUNT, shuffle, and config.activeEpoch
   - validators.yaml    Validator index assignments for each node
   - nodes.yaml         ENR (Ethereum Node Records) for peer discovery
   - genesis.json       Genesis state in JSON format
