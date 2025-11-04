@@ -23,7 +23,7 @@ Generates: config.yaml, validators.yaml, nodes.yaml, genesis.json, genesis.ssz, 
 Arguments:
   genesis-directory    Path to the genesis directory containing:
                        - validator-config.yaml (with node configurations and individual counts)
-                       - validator-config.yaml must include key: shuffle.activeEpoch (positive integer)
+                       - validator-config.yaml must include key: config.activeEpoch (positive integer)
 
 Example:
   $0 local-devnet/genesis
@@ -39,9 +39,9 @@ Generated Files:
 How It Works:
   1. Calculates GENESIS_TIME (current time + 30 seconds)
   2. Reads individual validator 'count' fields from validator-config.yaml
-  3. Reads shuffle.activeEpoch from validator-config.yaml (required)
+  3. Reads config.activeEpoch from validator-config.yaml (required)
   4. Automatically sums them to calculate total VALIDATOR_COUNT
-  5. Generates config.yaml from scratch with calculated values including shuffle.activeEpoch
+  5. Generates config.yaml from scratch with calculated values including config.activeEpoch
   6. Runs PK's genesis generator with correct parameters
 
 Note: config.yaml is a generated file - only edit validator-config.yaml
@@ -146,13 +146,13 @@ echo "   Key directory: $HASH_SIG_KEYS_DIR"
 echo ""
 
 # Read required active epoch exponent from validator-config.yaml
-ACTIVE_EPOCH=$(yq eval '.shuffle.activeEpoch' "$VALIDATOR_CONFIG_FILE" 2>/dev/null)
+ACTIVE_EPOCH=$(yq eval '.config.activeEpoch' "$VALIDATOR_CONFIG_FILE" 2>/dev/null)
 if [ "$ACTIVE_EPOCH" == "null" ] || [ -z "$ACTIVE_EPOCH" ]; then
-    echo "❌ Error: validator-config.yaml missing valid key shuffle.activeEpoch (positive integer required)" >&2
+    echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
     exit 1
 fi
 if ! [[ "$ACTIVE_EPOCH" =~ ^[0-9]+$ ]] || [ "$ACTIVE_EPOCH" -le 0 ]; then
-    echo "❌ Error: validator-config.yaml missing valid key shuffle.activeEpoch (positive integer required)" >&2
+    echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
     exit 1
 fi
 
@@ -230,7 +230,6 @@ GENESIS_TIME: $GENESIS_TIME
 VALIDATOR_COUNT: $TOTAL_VALIDATORS
 # Shuffle Settings
 shuffle: roundrobin
-
 config:
   activeEpoch: $ACTIVE_EPOCH
 EOF

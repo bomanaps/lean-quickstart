@@ -1,5 +1,5 @@
-shuffle:
-  type: roundrobin
+shuffle: roundrobin
+config:
   activeEpoch: 18
 validators:
   - name: "zeam_0"
