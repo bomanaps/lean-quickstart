@@ -57,9 +57,9 @@ fi
 privKeyPath="$item.key"
 echo "$privKey" > "$configDir/$privKeyPath"
 
-# Extract hash-sig key configuration
-keyType=$(yq eval ".validators[] | select(.name == \"$item\") | .keyType" "$validator_config_file")
-hashSigKeyIndex=$(yq eval ".validators[] | select(.name == \"$item\") | .hashSigKeyIndex" "$validator_config_file")
+# Extract hash-sig key configuration from top-level config
+keyType=$(yq eval ".config.keyType" "$validator_config_file")
+hashSigKeyIndex=$(yq eval ".validators | to_entries | .[] | select(.value.name == \"$item\") | .key" "$validator_config_file")
 
 # Load hash-sig keys if configured
 if [ "$keyType" == "hash-sig" ] && [ "$hashSigKeyIndex" != "null" ] && [ -n "$hashSigKeyIndex" ]; then

@@ -169,11 +169,10 @@ The `validator-config.yaml` file defines the shuffle algorithm, active epoch con
 shuffle: roundrobin
 config:
   activeEpoch: 18              # Required: Exponent for active epochs (2^18 = 262,144 signatures)
+  keyType: "hash-sig"          # Required: Network-wide signature scheme (hash-sig for post-quantum security)
 validators:
   - name: "zeam_0"
     privkey: "bdf953adc161873ba026330c56450453f582e3c4ee6cb713644794bcfdd85fe5"
-    keyType: "hash-sig"         # Required: Indicates using hash-sig keys
-    hashSigKeyIndex: 0          # Required: Index into generated keys (0, 1, 2, ...)
     enrFields:
       ip: "127.0.0.1"
       quic: 9000
@@ -184,21 +183,22 @@ validators:
 **Required Top-Level Fields:**
 - `shuffle`: Validator shuffle algorithm (e.g., `roundrobin`)
 - `config.activeEpoch`: Exponent for active epochs used in hash-sig key generation (2^activeEpoch signatures per active period)
+- `config.keyType`: Network-wide signature scheme - must be `"hash-sig"` for post-quantum security
 
 **Validator Fields:**
-- `keyType`: Must be set to `"hash-sig"` for post-quantum keys
-- `hashSigKeyIndex`: Index number mapping to `validator_{index}_pk.json` and `validator_{index}_sk.json`
+- Hash-sig key files are automatically mapped based on validator position in the array (first validator uses `validator_0_*.json`, second uses `validator_1_*.json`, etc.)
 
 ### Key Loading
 
 The `parse-vc.sh` script automatically loads hash-sig keys when starting nodes:
 
-1. Reads `keyType` and `hashSigKeyIndex` from validator config
-2. Locates corresponding key files in `genesis/hash-sig-keys/`
-3. Exports environment variables for client use:
+1. Reads `config.keyType` from validator config (network-wide setting)
+2. Automatically calculates key index based on validator position in the array
+3. Locates corresponding key files in `genesis/hash-sig-keys/`
+4. Exports environment variables for client use:
    - `HASH_SIG_PK_PATH`: Path to public key file
    - `HASH_SIG_SK_PATH`: Path to secret key file
-   - `HASH_SIG_KEY_INDEX`: Validator's key index
+   - `HASH_SIG_KEY_INDEX`: Validator's key index (auto-calculated)
 
 **Client Integration:**
 
@@ -273,12 +273,15 @@ Warning: Hash-sig public key not found at genesis/hash-sig-keys/validator_0_pk.j
 
 ---
 
-**Problem**: Wrong key index in validator config
+**Problem**: Hash-sig key file not found
 ```
 Warning: Hash-sig secret key not found at genesis/hash-sig-keys/validator_5_sk.json
 ```
 
-**Solution**: Ensure `hashSigKeyIndex` in `validator-config.yaml` matches an existing validator index (0 to N-1).
+**Solution**: This usually means you have more validators configured than hash-sig keys generated. Regenerate genesis files:
+```sh
+./generate-genesis.sh local-devnet/genesis
+```
 
 ## Automation Features
 
