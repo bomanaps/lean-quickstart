@@ -187,6 +187,107 @@ echo "   ✅ Hash-sig key generation complete!"
 echo ""
 
 # ========================================
+# Helper Function: Convert Pubkey JSON to Hex
+# ========================================
+convert_pubkey_to_hex() {
+    local pk_file="$1"
+    if [ ! -f "$pk_file" ]; then
+        echo "" >&2
+        return 1
+    fi
+    
+    # Use Python to convert root + parameter arrays to hex bytes
+    # Each integer is 32-bit, convert to little-endian bytes
+    # Pass file path as argument to avoid shell expansion issues
+    python3 - "$pk_file" <<'PYTHON_SCRIPT'
+import json
+import sys
+
+try:
+    pk_file = sys.argv[1]
+    with open(pk_file, 'r') as f:
+        data = json.load(f)
+
+    # Convert root array (8 integers) to bytes (little-endian)
+    root_bytes = b''.join([int(x).to_bytes(4, byteorder='little') for x in data['root']])
+
+    # Convert parameter array (5 integers) to bytes (little-endian)
+    param_bytes = b''.join([int(x).to_bytes(4, byteorder='little') for x in data['parameter']])
+
+    # Concatenate: root first, then parameter
+    pubkey_bytes = root_bytes + param_bytes
+
+    # Convert to hex with 0x prefix
+    print('0x' + pubkey_bytes.hex())
+except Exception as e:
+    sys.stderr.write(f"Error converting pubkey: {e}\n")
+    sys.exit(1)
+PYTHON_SCRIPT
+}
+
+# ========================================
+# Post-process validator-keys-manifest.yaml
+# ========================================
+echo "🔧 Post-processing validator-keys-manifest.yaml..."
+
+MANIFEST_FILE="$HASH_SIG_KEYS_DIR/validator-keys-manifest.yaml"
+
+# Check if manifest file exists (critical - exit if missing)
+if [ ! -f "$MANIFEST_FILE" ]; then
+    echo "   ❌ Error: validator-keys-manifest.yaml not found at $MANIFEST_FILE"
+    echo "   This file is required for validator key management"
+    exit 1
+fi
+
+# Check if Python3 is available (required - exit if missing)
+if ! command -v python3 &> /dev/null; then
+    echo "   ❌ Error: python3 is required but not found"
+    echo "   Install python3 to enable hex conversion in manifest"
+    echo "   On macOS: python3 is usually pre-installed"
+    echo "   On Linux: sudo apt-get install python3"
+    exit 1
+fi
+
+# Detect the field name used by hash-sig-cli (public_key_file or publicKey)
+# Check first validator entry to determine field name
+FIRST_VALIDATOR_FIELDS=$(yq eval '.validators[0] | keys | .[]' "$MANIFEST_FILE" 2>/dev/null)
+PUBKEY_FIELD=""
+if echo "$FIRST_VALIDATOR_FIELDS" | grep -q "public_key_file"; then
+    PUBKEY_FIELD="public_key_file"
+elif echo "$FIRST_VALIDATOR_FIELDS" | grep -q "publicKey"; then
+    PUBKEY_FIELD="publicKey"
+else
+    echo "   ❌ Error: Could not determine pubkey field name in manifest"
+    echo "   Expected 'public_key_file' or 'publicKey' field"
+    exit 1
+fi
+
+echo "   Detected pubkey field: $PUBKEY_FIELD"
+
+# Update each validator entry in the manifest
+for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
+    PK_FILE="$HASH_SIG_KEYS_DIR/validator_${i}_pk.json"
+    if [ ! -f "$PK_FILE" ]; then
+        echo "   ❌ Error: Public key file not found: $PK_FILE"
+        exit 1
+    fi
+    
+    PUBKEY_HEX=$(convert_pubkey_to_hex "$PK_FILE")
+    if [ -z "$PUBKEY_HEX" ]; then
+        echo "   ❌ Error: Failed to convert validator $i pubkey to hex"
+        exit 1
+    fi
+    
+    # Update manifest using yq with detected field name
+    yq eval ".validators[$i].$PUBKEY_FIELD = \"$PUBKEY_HEX\"" -i "$MANIFEST_FILE"
+    echo "   ✅ Updated validator $i pubkey in manifest"
+done
+
+echo "   ✅ Updated validator-keys-manifest.yaml with hex pubkeys"
+
+echo ""
+
+# ========================================
 # Step 2: Generate config.yaml
 # ========================================
 echo "🔧 Step 2: Generating config.yaml..."
@@ -278,6 +379,89 @@ echo "   ✅ Generated: validators.yaml"
 echo "   ✅ Generated: nodes.yaml"
 echo "   ✅ Generated: genesis.json"
 echo "   ✅ Generated: genesis.ssz"
+echo ""
+
+# ========================================
+# Add genesis_validators to config.yaml
+# ========================================
+echo "🔧 Adding genesis_validators to config.yaml..."
+
+# Check if Python3 is available (required - exit if missing)
+if ! command -v python3 &> /dev/null; then
+    echo "   ❌ Error: python3 is required but not found"
+    echo "   Install python3 to enable genesis_validators in config.yaml"
+    echo "   On macOS: python3 is usually pre-installed"
+    echo "   On Linux: sudo apt-get install python3"
+    exit 1
+fi
+
+# Build genesis_validators array
+CUMULATIVE_INDEX=0
+VALIDATOR_ENTRY_INDEX=0
+
+# Create temporary file for genesis_validators YAML structure
+GENESIS_VALIDATORS_TMP=$(mktemp)
+
+# Iterate through validators in validator-config.yaml
+while IFS= read -r validator_name; do
+    COUNT=$(yq eval ".validators[$VALIDATOR_ENTRY_INDEX].count" "$VALIDATOR_CONFIG_FILE")
+    
+    # Read the pubkey for this validator entry
+    PK_FILE="$HASH_SIG_KEYS_DIR/validator_${VALIDATOR_ENTRY_INDEX}_pk.json"
+    if [ ! -f "$PK_FILE" ]; then
+        echo "   ❌ Error: Public key file not found: $PK_FILE"
+        rm -f "$GENESIS_VALIDATORS_TMP"
+        exit 1
+    fi
+    
+    # Convert pubkey to hex
+    PUBKEY_HEX=$(convert_pubkey_to_hex "$PK_FILE")
+    if [ -z "$PUBKEY_HEX" ]; then
+        echo "   ❌ Error: Failed to convert validator $VALIDATOR_ENTRY_INDEX pubkey to hex"
+        rm -f "$GENESIS_VALIDATORS_TMP"
+        exit 1
+    fi
+    
+    # For each validator index this entry represents
+    for ((idx=0; idx<COUNT; idx++)); do
+        ACTUAL_INDEX=$((CUMULATIVE_INDEX + idx))
+        # Build YAML structure in temp file
+        echo "  - index: $ACTUAL_INDEX" >> "$GENESIS_VALIDATORS_TMP"
+        echo "    pubkey: \"$PUBKEY_HEX\"" >> "$GENESIS_VALIDATORS_TMP"
+    done
+    
+    CUMULATIVE_INDEX=$((CUMULATIVE_INDEX + COUNT))
+    VALIDATOR_ENTRY_INDEX=$((VALIDATOR_ENTRY_INDEX + 1))
+done < <(yq eval '.validators[].name' "$VALIDATOR_CONFIG_FILE")
+
+# Use yq to properly merge genesis_validators into config.yaml (safe YAML manipulation)
+if [ -s "$GENESIS_VALIDATORS_TMP" ]; then
+    # Create a proper YAML structure with genesis_validators key
+    GENESIS_VALIDATORS_YAML_TMP=$(mktemp)
+    echo "genesis_validators:" > "$GENESIS_VALIDATORS_YAML_TMP"
+    cat "$GENESIS_VALIDATORS_TMP" >> "$GENESIS_VALIDATORS_YAML_TMP"
+    
+    # Use yq to merge the genesis_validators into config.yaml
+    # This safely adds/updates the genesis_validators section
+    yq eval-all 'select(fileIndex == 0) *+ select(fileIndex == 1)' "$CONFIG_FILE" "$GENESIS_VALIDATORS_YAML_TMP" > "${CONFIG_FILE}.tmp" 2>/dev/null
+    
+    if [ $? -eq 0 ] && [ -s "${CONFIG_FILE}.tmp" ]; then
+        mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+        echo "   ✅ Added genesis_validators to config.yaml"
+    else
+        # Fallback: append using proper YAML format if yq merge fails
+        echo "" >> "$CONFIG_FILE"
+        cat "$GENESIS_VALIDATORS_YAML_TMP" >> "$CONFIG_FILE"
+        echo "   ✅ Added genesis_validators to config.yaml (using fallback method)"
+    fi
+    
+    rm -f "$GENESIS_VALIDATORS_TMP" "$GENESIS_VALIDATORS_YAML_TMP"
+else
+    echo "   ❌ Error: No genesis_validators to add (empty array)"
+    rm -f "$GENESIS_VALIDATORS_TMP"
+    exit 1
+fi
+
 echo ""
 
 # ========================================
