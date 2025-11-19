@@ -99,7 +99,7 @@ fi
 echo "  ✅ docker found: $(which docker)"
 
 # Hash-sig-cli Docker image
-HASH_SIG_CLI_IMAGE="blockblaz/hash-sig-cli:latest"
+HASH_SIG_CLI_IMAGE="hash-sig-cli:local"
 echo "  ✅ Using hash-sig-cli Docker image: $HASH_SIG_CLI_IMAGE"
 
 echo ""
@@ -184,6 +184,57 @@ done
 
 echo ""
 echo "   ✅ Hash-sig key generation complete!"
+echo ""
+
+# ========================================
+# Verify validator-keys-manifest.yaml
+# ========================================
+echo "🔧 Verifying validator-keys-manifest.yaml..."
+
+MANIFEST_FILE="$HASH_SIG_KEYS_DIR/validator-keys-manifest.yaml"
+
+# Check if manifest file exists (critical - exit if missing)
+if [ ! -f "$MANIFEST_FILE" ]; then
+    echo "   ❌ Error: validator-keys-manifest.yaml not found at $MANIFEST_FILE"
+    echo "   This file is required for validator key management"
+    exit 1
+fi
+
+# Detect the field name used by hash-sig-cli (pubkey_hex, public_key_file, or publicKey)
+# Check first validator entry to determine field name
+FIRST_VALIDATOR_FIELDS=$(yq eval '.validators[0] | keys | .[]' "$MANIFEST_FILE" 2>/dev/null)
+PUBKEY_FIELD=""
+if echo "$FIRST_VALIDATOR_FIELDS" | grep -q "pubkey_hex"; then
+    PUBKEY_FIELD="pubkey_hex"
+elif echo "$FIRST_VALIDATOR_FIELDS" | grep -q "public_key_file"; then
+    PUBKEY_FIELD="public_key_file"
+elif echo "$FIRST_VALIDATOR_FIELDS" | grep -q "publicKey"; then
+    PUBKEY_FIELD="publicKey"
+else
+    echo "   ❌ Error: Could not determine pubkey field name in manifest"
+    echo "   Expected 'pubkey_hex', 'public_key_file', or 'publicKey' field"
+    exit 1
+fi
+
+# Verify that manifest contains hex bytes (not file names)
+FIRST_PUBKEY=$(yq eval ".validators[0].$PUBKEY_FIELD" "$MANIFEST_FILE" 2>/dev/null)
+if [ -z "$FIRST_PUBKEY" ]; then
+    echo "   ❌ Error: Could not read pubkey from manifest"
+    exit 1
+fi
+
+# Check if it's hex format (starts with 0x)
+if [[ ! "$FIRST_PUBKEY" =~ ^0x[0-9a-fA-F]+$ ]]; then
+    echo "   ❌ Error: Manifest does not contain hex pubkeys"
+    echo "   Found: $FIRST_PUBKEY"
+    echo "   Expected format: 0x[hex bytes]"
+    echo "   Make sure hash-sig-cli generates manifest with hex bytes"
+    exit 1
+fi
+
+echo "   ✅ Manifest verified - contains hex pubkeys"
+echo "   Detected pubkey field: $PUBKEY_FIELD"
+
 echo ""
 
 # ========================================
@@ -278,6 +329,76 @@ echo "   ✅ Generated: validators.yaml"
 echo "   ✅ Generated: nodes.yaml"
 echo "   ✅ Generated: genesis.json"
 echo "   ✅ Generated: genesis.ssz"
+echo ""
+
+# ========================================
+# Add genesis_validators to config.yaml
+# ========================================
+echo "🔧 Adding genesis_validators to config.yaml..."
+
+# Calculate cumulative validator indices
+CUMULATIVE_INDEX=0
+VALIDATOR_ENTRY_INDEX=0
+
+# Create temporary file for genesis_validators YAML
+GENESIS_VALIDATORS_TMP=$(mktemp)
+
+# Iterate through validators in validator-config.yaml
+while IFS= read -r validator_name; do
+    COUNT=$(yq eval ".validators[$VALIDATOR_ENTRY_INDEX].count" "$VALIDATOR_CONFIG_FILE")
+    
+    # Read hex pubkey directly from manifest (hash-sig-cli now generates hex)
+    PUBKEY_HEX=$(yq eval ".validators[$VALIDATOR_ENTRY_INDEX].$PUBKEY_FIELD" "$MANIFEST_FILE" 2>/dev/null)
+    
+    if [ -z "$PUBKEY_HEX" ] || [ "$PUBKEY_HEX" == "null" ]; then
+        echo "   ❌ Error: Could not read pubkey for validator $VALIDATOR_ENTRY_INDEX from manifest"
+        rm -f "$GENESIS_VALIDATORS_TMP"
+        exit 1
+    fi
+    
+    # Verify it's hex format
+    if [[ ! "$PUBKEY_HEX" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        echo "   ❌ Error: Invalid pubkey format for validator $VALIDATOR_ENTRY_INDEX"
+        echo "   Found: $PUBKEY_HEX"
+        echo "   Expected format: 0x[hex bytes]"
+        rm -f "$GENESIS_VALIDATORS_TMP"
+        exit 1
+    fi
+    
+    # For each validator index this entry represents
+    for ((idx=0; idx<COUNT; idx++)); do
+        ACTUAL_INDEX=$((CUMULATIVE_INDEX + idx))
+        # Build YAML structure in temp file
+        echo "  - index: $ACTUAL_INDEX" >> "$GENESIS_VALIDATORS_TMP"
+        echo "    pubkey: \"$PUBKEY_HEX\"" >> "$GENESIS_VALIDATORS_TMP"
+    done
+    
+    CUMULATIVE_INDEX=$((CUMULATIVE_INDEX + COUNT))
+    VALIDATOR_ENTRY_INDEX=$((VALIDATOR_ENTRY_INDEX + 1))
+done < <(yq eval '.validators[].name' "$VALIDATOR_CONFIG_FILE")
+
+# Merge genesis_validators into config.yaml using yq
+if [ -s "$GENESIS_VALIDATORS_TMP" ]; then
+    # Build a temporary YAML file with just genesis_validators
+    GENESIS_VALIDATORS_YAML=$(mktemp)
+    echo "genesis_validators:" > "$GENESIS_VALIDATORS_YAML"
+    cat "$GENESIS_VALIDATORS_TMP" >> "$GENESIS_VALIDATORS_YAML"
+    
+    # Use yq to merge the genesis_validators into config.yaml
+    yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' -i "$CONFIG_FILE" "$GENESIS_VALIDATORS_YAML" 2>/dev/null || {
+        # Fallback: append manually if yq merge fails
+        echo "" >> "$CONFIG_FILE"
+        cat "$GENESIS_VALIDATORS_YAML" >> "$CONFIG_FILE"
+    }
+    rm -f "$GENESIS_VALIDATORS_YAML"
+    echo "   ✅ Added genesis_validators to config.yaml"
+else
+    echo "   ⚠️  Warning: No genesis_validators to add"
+fi
+
+# Clean up temp file
+rm -f "$GENESIS_VALIDATORS_TMP"
+
 echo ""
 
 # ========================================
