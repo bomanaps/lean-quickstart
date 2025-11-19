@@ -163,7 +163,12 @@ fi
 # Convert to absolute path for Docker volume mounting
 GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
 
+# Get current user ID and group ID to avoid permission issues
+CURRENT_UID=$(id -u)
+CURRENT_GID=$(id -g)
+
 docker run --rm \
+  --user "$CURRENT_UID:$CURRENT_GID" \
   -v "$GENESIS_DIR_ABS:/genesis" \
   "$HASH_SIG_CLI_IMAGE" \
   generate \
@@ -300,11 +305,16 @@ echo ""
 GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
 PARENT_DIR_ABS="$(cd "$GENESIS_DIR/.." && pwd)"
 
+# Get current user ID and group ID to avoid permission issues
+CURRENT_UID=$(id -u)
+CURRENT_GID=$(id -g)
+
 # Run PK's tool
 # Note: PK's tool expects parent directory as mount point
 echo "   Executing docker command..."
 
 docker run --rm \
+  --user "$CURRENT_UID:$CURRENT_GID" \
   -v "$PARENT_DIR_ABS:/data" \
   "$PK_DOCKER_IMAGE" \
   leanchain \
