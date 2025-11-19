@@ -379,8 +379,7 @@ while IFS= read -r validator_name; do
     for ((idx=0; idx<COUNT; idx++)); do
         ACTUAL_INDEX=$((CUMULATIVE_INDEX + idx))
         # Build YAML structure in temp file
-        echo "  - index: $ACTUAL_INDEX" >> "$GENESIS_VALIDATORS_TMP"
-        echo "    pubkey: \"$PUBKEY_HEX\"" >> "$GENESIS_VALIDATORS_TMP"
+        echo "    - \"$PUBKEY_HEX\"" >> "$GENESIS_VALIDATORS_TMP"
     done
     
     CUMULATIVE_INDEX=$((CUMULATIVE_INDEX + COUNT))
