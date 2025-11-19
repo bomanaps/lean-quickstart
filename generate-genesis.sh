@@ -76,6 +76,25 @@ GENESIS_DIR="$1"
 CONFIG_FILE="$GENESIS_DIR/config.yaml"
 VALIDATOR_CONFIG_FILE="$GENESIS_DIR/validator-config.yaml"
 
+# Parse optional --skipKeyGen flag
+SKIP_KEY_GEN=""
+shift
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --skipKeyGen)
+            SKIP_KEY_GEN="true"
+            shift
+            ;;
+        --skipKeyGen=false)
+            SKIP_KEY_GEN="false"
+            shift
+            ;;
+        *)
+            shift
+            ;;
+    esac
+done
+
 # ========================================
 # Check Dependencies
 # ========================================
@@ -140,56 +159,86 @@ if [ -z "$VALIDATOR_COUNT" ] || [ "$VALIDATOR_COUNT" == "null" ] || [ "$VALIDATO
     exit 1
 fi
 
-echo "   Generating keys for $VALIDATOR_COUNT validators..."
-echo "   Using scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
-echo "   Key directory: $HASH_SIG_KEYS_DIR"
-echo ""
-
-# Read required active epoch exponent from validator-config.yaml
-ACTIVE_EPOCH=$(yq eval '.config.activeEpoch' "$VALIDATOR_CONFIG_FILE" 2>/dev/null)
-if [ "$ACTIVE_EPOCH" == "null" ] || [ -z "$ACTIVE_EPOCH" ]; then
-    echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
-    exit 1
-fi
-if ! [[ "$ACTIVE_EPOCH" =~ ^[0-9]+$ ]] || [ "$ACTIVE_EPOCH" -le 0 ]; then
-    echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
-    exit 1
-fi
-
-# Generate hash-sig keys for all validators using Docker
-# Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8
-# Active epochs: 2^ACTIVE_EPOCH (from validator-config.yaml)
-# Total lifetime: 2^32 (4,294,967,296)
-# Convert to absolute path for Docker volume mounting
-GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
-
-# Get current user ID and group ID to avoid permission issues
-CURRENT_UID=$(id -u)
-CURRENT_GID=$(id -g)
-
-docker run --rm \
-  --user "$CURRENT_UID:$CURRENT_GID" \
-  -v "$GENESIS_DIR_ABS:/genesis" \
-  "$HASH_SIG_CLI_IMAGE" \
-  generate \
-  --num-validators "$VALIDATOR_COUNT" \
-  --log-num-active-epochs "$ACTIVE_EPOCH" \
-  --output-dir "/genesis/hash-sig-keys"
-
-if [ $? -ne 0 ]; then
-    echo "   ❌ Failed to generate hash-sig keys"
-    exit 1
+# Check if keys already exist
+MANIFEST_FILE="$HASH_SIG_KEYS_DIR/validator-keys-manifest.yaml"
+KEYS_EXIST=true
+if [ ! -f "$MANIFEST_FILE" ]; then
+    KEYS_EXIST=false
+else
+    for ((i=0; i<VALIDATOR_COUNT; i++)); do
+        if [ ! -f "$HASH_SIG_KEYS_DIR/validator_${i}_pk.json" ] || \
+           [ ! -f "$HASH_SIG_KEYS_DIR/validator_${i}_sk.json" ]; then
+            KEYS_EXIST=false
+            break
+        fi
+    done
 fi
 
-echo "   ✅ Generated keys for $VALIDATOR_COUNT validators"
-echo "   ✅ Files created:"
-for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
-    echo "      - validator_${i}_pk.json and validator_${i}_sk.json"
-done
+# Determine if we should skip key generation
+if [ "$SKIP_KEY_GEN" == "false" ]; then
+    SHOULD_SKIP=false
+elif [ "$SKIP_KEY_GEN" == "true" ] || [ "$KEYS_EXIST" == "true" ]; then
+    SHOULD_SKIP=true
+else
+    SHOULD_SKIP=false
+fi
 
-echo ""
-echo "   ✅ Hash-sig key generation complete!"
-echo ""
+if [ "$SHOULD_SKIP" == "true" ]; then
+    echo "   ⏭️  Skipping key generation - keys already present"
+    echo "   Key directory: $HASH_SIG_KEYS_DIR"
+    echo ""
+else
+    echo "   Generating keys for $VALIDATOR_COUNT validators..."
+    echo "   Using scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
+    echo "   Key directory: $HASH_SIG_KEYS_DIR"
+    echo ""
+
+    # Read required active epoch exponent from validator-config.yaml
+    ACTIVE_EPOCH=$(yq eval '.config.activeEpoch' "$VALIDATOR_CONFIG_FILE" 2>/dev/null)
+    if [ "$ACTIVE_EPOCH" == "null" ] || [ -z "$ACTIVE_EPOCH" ]; then
+        echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
+        exit 1
+    fi
+    if ! [[ "$ACTIVE_EPOCH" =~ ^[0-9]+$ ]] || [ "$ACTIVE_EPOCH" -le 0 ]; then
+        echo "❌ Error: validator-config.yaml missing valid key config.activeEpoch (positive integer required)" >&2
+        exit 1
+    fi
+
+    # Generate hash-sig keys for all validators using Docker
+    # Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8
+    # Active epochs: 2^ACTIVE_EPOCH (from validator-config.yaml)
+    # Total lifetime: 2^32 (4,294,967,296)
+    # Convert to absolute path for Docker volume mounting
+    GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
+
+    # Get current user ID and group ID to avoid permission issues
+    CURRENT_UID=$(id -u)
+    CURRENT_GID=$(id -g)
+
+    docker run --rm \
+      --user "$CURRENT_UID:$CURRENT_GID" \
+      -v "$GENESIS_DIR_ABS:/genesis" \
+      "$HASH_SIG_CLI_IMAGE" \
+      generate \
+      --num-validators "$VALIDATOR_COUNT" \
+      --log-num-active-epochs "$ACTIVE_EPOCH" \
+      --output-dir "/genesis/hash-sig-keys"
+
+    if [ $? -ne 0 ]; then
+        echo "   ❌ Failed to generate hash-sig keys"
+        exit 1
+    fi
+
+    echo "   ✅ Generated keys for $VALIDATOR_COUNT validators"
+    echo "   ✅ Files created:"
+    for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
+        echo "      - validator_${i}_pk.json and validator_${i}_sk.json"
+    done
+
+    echo ""
+    echo "   ✅ Hash-sig key generation complete!"
+    echo ""
+fi
 
 # ========================================
 # Verify validator-keys-manifest.yaml
