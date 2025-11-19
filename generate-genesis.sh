@@ -76,16 +76,12 @@ GENESIS_DIR="$1"
 CONFIG_FILE="$GENESIS_DIR/config.yaml"
 VALIDATOR_CONFIG_FILE="$GENESIS_DIR/validator-config.yaml"
 
-# Parse optional --skipKeyGen flag
-SKIP_KEY_GEN=""
+# Parse optional --skipKeyGen flag, default true
+SKIP_KEY_GEN="true"
 shift
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --skipKeyGen)
-            SKIP_KEY_GEN="true"
-            shift
-            ;;
-        --skipKeyGen=false)
+        --forceKeyGen)
             SKIP_KEY_GEN="false"
             shift
             ;;
@@ -174,10 +170,13 @@ else
     done
 fi
 
+echo "SKIP_KEY_GEN=$SKIP_KEY_GEN"
+echo "KEYS_EXIST=$KEYS_EXIST"
+
 # Determine if we should skip key generation
 if [ "$SKIP_KEY_GEN" == "false" ]; then
     SHOULD_SKIP=false
-elif [ "$SKIP_KEY_GEN" == "true" ] || [ "$KEYS_EXIST" == "true" ]; then
+elif [ "$SKIP_KEY_GEN" == "true" ] && [ "$KEYS_EXIST" == "true" ]; then
     SHOULD_SKIP=true
 else
     SHOULD_SKIP=false
