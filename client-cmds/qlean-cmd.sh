@@ -12,6 +12,7 @@ node_binary="$scriptDir/qlean/build/src/executable/qlean \
       --node-id $item --node-key $configDir/$privKeyPath \
       --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1 \
       --prometheus_port $metricsPort"
+      
 node_docker="--platform linux/amd64 qdrvm/qlean-mini:dd67521 \
       --genesis /config/config.yaml \
       --validator-registry-path /config/validators.yaml \
