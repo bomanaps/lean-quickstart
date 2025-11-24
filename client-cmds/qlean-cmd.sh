@@ -20,7 +20,7 @@ node_docker="--platform linux/amd64 qdrvm/qlean-mini:dd67521 \
       --data-dir /data \
       --node-id $item --node-key /config/$privKeyPath \
       --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1 \
-      --prometheus_port $metricsPort"
+      --prometheus-port $metricsPort"
 
 # choose either binary or docker
 node_setup="docker"
