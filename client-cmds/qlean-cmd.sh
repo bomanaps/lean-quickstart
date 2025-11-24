@@ -11,7 +11,7 @@ node_binary="$scriptDir/qlean/build/src/executable/qlean \
       --data-dir $dataDir/$item \
       --node-id $item --node-key $configDir/$privKeyPath \
       --listen-addr /ip4/0.0.0.0/udp/$quicPort/quic-v1 \
-      --prometheus_port $metricsPort"
+      --prometheus-port $metricsPort"
       
 node_docker="--platform linux/amd64 qdrvm/qlean-mini:dd67521 \
       --genesis /config/config.yaml \
