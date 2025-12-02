@@ -325,7 +325,7 @@ while IFS= read -r line; do
     validator_name=$(echo "$line" | cut -d: -f1)
     validator_count=$(echo "$line" | cut -d: -f2 | xargs)
     echo "     - $validator_name: $validator_count"
-done < <(yq eval '.validators[] | .name + ":" + (.count | tostring)' "$VALIDATOR_CONFIG_FILE")
+done < <(yq eval '.validators[] | "\(.name):\(.count)"' "$VALIDATOR_CONFIG_FILE")
 
 echo "   Total validator count: $TOTAL_VALIDATORS"
 
