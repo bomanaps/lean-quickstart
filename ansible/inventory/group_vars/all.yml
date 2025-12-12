@@ -1,0 +1,27 @@
+---
+# Global variables for all nodes
+
+# Paths (relative to playbook execution directory or absolute)
+network_dir: "{{ playbook_dir }}/../local-devnet"
+genesis_dir: "{{ network_dir }}/genesis"
+data_dir: "{{ network_dir }}/data"
+validator_config_file: "{{ genesis_dir }}/validator-config.yaml"
+
+# Remote paths (for remote deployments)
+# Use standard paths on remote hosts
+remote_genesis_dir: "/opt/lean-quickstart/genesis"
+remote_data_dir: "/opt/lean-quickstart/data"
+
+# Docker settings
+docker_with_sudo: false
+docker_network_mode: host
+
+# Node deployment mode: 'docker' or 'binary'
+deployment_mode: docker
+
+# Clean data before deployment
+clean_data: false
+
+# Node execution settings
+popup_terminal: false
+

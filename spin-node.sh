@@ -10,19 +10,7 @@ fi
 # 0. parse env and args
 source "$(dirname $0)/parse-env.sh"
 
-#1. setup genesis params and run genesis generator
-source "$(dirname $0)/set-up.sh"
-# ✅ Genesis generator implemented using PK's eth-beacon-genesis tool
-# Generates: validators.yaml, nodes.yaml, genesis.json, genesis.ssz, and .key files
-
-# 2. collect the nodes that the user has asked us to spin and perform setup
-if [ "$validatorConfig" == "genesis_bootnode" ] || [ -z "$validatorConfig" ]; then
-    validator_config_file="$configDir/validator-config.yaml"
-else
-    validator_config_file="$validatorConfig"
-fi
-
-# Check if yq is installed
+# Check if yq is installed (needed for deployment mode detection)
 if ! command -v yq &> /dev/null; then
     echo "Error: yq is required but not installed. Please install yq first."
     echo "On macOS: brew install yq"
@@ -30,6 +18,47 @@ if ! command -v yq &> /dev/null; then
     exit 1
 fi
 
+# Determine initial validator config file location
+if [ "$validatorConfig" == "genesis_bootnode" ] || [ -z "$validatorConfig" ]; then
+    validator_config_file="$configDir/validator-config.yaml"
+else
+    validator_config_file="$validatorConfig"
+fi
+
+# Read deployment mode: command-line argument takes precedence over config file
+if [ -n "$deploymentMode" ]; then
+    # Use command-line argument if provided
+    deployment_mode="$deploymentMode"
+    echo "Using deployment mode from command line: $deployment_mode"
+else
+    # Otherwise read from config file (default to 'local' if not specified)
+    if [ -f "$validator_config_file" ]; then
+        deployment_mode=$(yq eval '.deployment_mode // "local"' "$validator_config_file")
+        echo "Using deployment mode from config file: $deployment_mode"
+    else
+        deployment_mode="local"
+        echo "Using default deployment mode: $deployment_mode"
+    fi
+fi
+
+# If deployment mode is ansible and no explicit validatorConfig was provided,
+# switch to ansible-devnet/genesis/validator-config.yaml and update configDir/dataDir
+# This must happen BEFORE set-up.sh so genesis generation uses the correct directory
+if [ "$deployment_mode" == "ansible" ] && ([ "$validatorConfig" == "genesis_bootnode" ] || [ -z "$validatorConfig" ]); then
+    configDir="$scriptDir/ansible-devnet/genesis"
+    dataDir="$scriptDir/ansible-devnet/data"
+    validator_config_file="$configDir/validator-config.yaml"
+    echo "Using Ansible deployment: configDir=$configDir, validator config=$validator_config_file"
+fi
+
+#1. setup genesis params and run genesis generator
+source "$(dirname $0)/set-up.sh"
+# ✅ Genesis generator implemented using PK's eth-beacon-genesis tool
+# Generates: validators.yaml, nodes.yaml, genesis.json, genesis.ssz, and .key files
+
+# 2. collect the nodes that the user has asked us to spin and perform setup
+
+# Load nodes from validator config file
 if [ -f "$validator_config_file" ]; then
     # Use yq to extract node names from validator config
     nodes=($(yq eval '.validators[].name' "$validator_config_file"))
@@ -41,6 +70,9 @@ if [ -f "$validator_config_file" ]; then
     fi
 else
     echo "Error: Validator config file not found at $validator_config_file"
+    if [ "$deployment_mode" == "ansible" ]; then
+        echo "Please create ansible-devnet/genesis/validator-config.yaml for Ansible deployments"
+    fi
     nodes=()
     exit 1
 fi
@@ -87,7 +119,89 @@ if [ ! -n "$node_present" ]; then
   exit;
 fi;
 
-# 3. run clients
+# Check deployment mode and route to ansible if needed
+if [ "$deployment_mode" == "ansible" ]; then
+  # Validate Ansible prerequisites before routing to Ansible deployment
+  echo "Validating Ansible prerequisites..."
+  
+  # Check if Ansible is installed
+  if ! command -v ansible-playbook &> /dev/null; then
+    echo "Error: ansible-playbook is not installed."
+    echo "Install Ansible:"
+    echo "  macOS:   brew install ansible"
+    echo "  Ubuntu:  sudo apt-get install ansible"
+    echo "  pip:     pip install ansible"
+    exit 1
+  fi
+  
+  # Check if docker collection is available
+  if ! ansible-galaxy collection list | grep -q "community.docker" 2>/dev/null; then
+    echo "Warning: community.docker collection not found. Installing..."
+    ansible-galaxy collection install community.docker
+  fi
+  
+  echo "✅ Ansible prerequisites validated"
+  
+  # Handle stop action
+  if [ -n "$stopNodes" ] && [ "$stopNodes" == "true" ]; then
+    echo "Stopping nodes via Ansible..."
+    if ! "$scriptDir/run-ansible.sh" "$configDir" "$node" "$cleanData" "$validatorConfig" "$validator_config_file" "$sshKeyFile" "$useRoot" "stop"; then
+      echo "❌ Ansible stop operation failed. Exiting."
+      exit 1
+    fi
+    exit 0
+  fi
+  
+  # Call separate Ansible execution script
+  # If Ansible deployment fails, exit immediately (don't fall through to local deployment)
+  if ! "$scriptDir/run-ansible.sh" "$configDir" "$node" "$cleanData" "$validatorConfig" "$validator_config_file" "$sshKeyFile" "$useRoot"; then
+    echo "❌ Ansible deployment failed. Exiting."
+    exit 1
+  fi
+  
+  # Ansible deployment succeeded, exit normally
+  exit 0
+fi
+
+# Handle stop action for local deployment
+if [ -n "$stopNodes" ] && [ "$stopNodes" == "true" ]; then
+  echo "Stopping local nodes..."
+  
+  # Load nodes from validator config file
+  if [ -f "$validator_config_file" ]; then
+    nodes=($(yq eval '.validators[].name' "$validator_config_file"))
+  else
+    echo "Error: Validator config file not found at $validator_config_file"
+    exit 1
+  fi
+  
+  # Determine which nodes to stop
+  if [[ "$node" == "all" ]]; then
+    stop_nodes=("${nodes[@]}")
+  else
+    if [[ "$node" == *","* ]]; then
+      IFS=',' read -r -a requested_nodes <<< "$node"
+    else
+      IFS=' ' read -r -a requested_nodes <<< "$node"
+    fi
+    stop_nodes=("${requested_nodes[@]}")
+  fi
+  
+  # Stop Docker containers
+  for node_name in "${stop_nodes[@]}"; do
+    echo "Stopping $node_name..."
+    if [ -n "$dockerWithSudo" ]; then
+      sudo docker rm -f "$node_name" 2>/dev/null || echo "  Container $node_name not found or already stopped"
+    else
+      docker rm -f "$node_name" 2>/dev/null || echo "  Container $node_name not found or already stopped"
+    fi
+  done
+  
+  echo "✅ Local nodes stopped successfully!"
+  exit 0
+fi
+
+# 3. run clients (local deployment)
 mkdir -p $dataDir
 # Detect OS and set appropriate terminal command
 popupTerminalCmd=""

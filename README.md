@@ -11,7 +11,7 @@ A single command line quickstart to spin up lean node(s)
     - Uses PK's `eth-beacon-genesis` docker tool (not custom tooling)
     - Generates PQ keys based on specified configuration in `validator-config.yaml`
         - Force regen with flag `--forceKeyGen` when supplied with `generateGenesis`
-- ✅ Integrates zeam, ream, qlean (and more incoming...)
+- ✅ Integrates zeam, ream, qlean, lantern (and more incoming...)
 - ✅ Configure to run clients in docker or binary mode for easy development
 - ✅ Linux & Mac compatible & tested
 - ✅ Option to operate on single or multiple nodes or `all`
@@ -38,9 +38,15 @@ cd lean-quickstart
 
 ### Quickly startup various nodes as a local devnet
 
+**Using spin-node.sh (unified entry point):**
 ```sh
+# Local deployment (default)
 NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --popupTerminal
+
+# Ansible deployment (set deployment_mode: ansible in validator-config.yaml or use --deploymentMode ansible)
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --deploymentMode ansible
 ```
+> 📖 **Note**: When deployment mode is `ansible`, the script automatically uses `ansible-devnet/genesis/validator-config.yaml` and generates genesis files in `ansible-devnet/genesis/`. This keeps local and remote deployment configurations separate. See [Ansible Deployment](#ansible-deployment) section or [ansible/README.md](ansible/README.md) for details
 
 ### Startup specific nodes only
 
@@ -54,6 +60,8 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node "zeam_0 qlean_0" --generateGenesi
 # Run only a single node
 NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0 --generateGenesis --popupTerminal
 ```
+> 💡 **Note**: The same `spin-node.sh` command works for both local and Ansible deployments. The deployment mode is determined by the `deployment_mode` field in `validator-config.yaml` or the `--deploymentMode` parameter. When using Ansible deployment mode, the script automatically uses `ansible-devnet/genesis/validator-config.yaml` to keep configurations separate.
+  
 
 ### Enabling metrics
 
@@ -65,6 +73,8 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --metrics
 ## Args
 
 1. `NETWORK_DIR` is an env to specify the network directory. Should have a `genesis` directory with genesis config. A `data` folder will be created inside this `NETWORK_DIR` if not already there.
+   - **For local deployments**: Use `local-devnet` (or any custom directory)
+   - **For Ansible deployments**: When `deployment_mode: ansible` is set, the script automatically uses `ansible-devnet/` directory instead, keeping configurations separate
   `genesis` directory should have the following files
 
     a. `validator-config.yaml` which has node setup information for all the bootnodes
@@ -73,18 +83,43 @@ NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --metrics
     d. `config.yaml` the actual network config
 
 2. `--generateGenesis` regenerate all genesis files with fresh genesis time and clean data directories
-3. `--popupTerminal` if you want to pop out new terminals to run the nodes, opens gnome terminals
-4. `--node` specify which node(s) you want to run:
+3. `--forceKeyGen` force regeneration of hash-sig validator keys even if they already exist. 
+   - Must be used together with `--generateGenesis` flag
+   - This will **overwrite** existing keys in `genesis/hash-sig-keys/`
+   - Use this when you need to regenerate keys (e.g., after key exhaustion, configuration changes, or testing)
+   - Example: `NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --forceKeyGen`
+4. `--popupTerminal` if you want to pop out new terminals to run the nodes, opens gnome terminals
+5. `--node` specify which node(s) you want to run:
    - Use `all` to run all the nodes in a single go
    - Specify a single node name (e.g., `zeam_0`) to run just that node
    - Use comma-separated node names (e.g., `zeam_0,qlean_0`) to run multiple specific nodes
    - Use whitespace-separated node names (e.g., `"zeam_0 ream_0"`) to run multiple specific nodes
    
    The client is provided this input so as to parse the correct node configuration to startup the node.
-5. `--validatorConfig` is the path to specify your nodes `validator-config.yaml`, `validators.yaml` (for which `--node` is still the node key to index) if your node is not a bootnode.
+6. `--validatorConfig` is the path to specify your nodes `validator-config.yaml`, `validators.yaml` (for which `--node` is still the node key to index) if your node is not a bootnode.
    If unspecified it assumes value of `genesis_bootnode` which is to say that your node config is to be picked from `genesis` folder with `--node` as the node key index.
    This value is further provided to the client so that they can parse the correct config information.
-6. `--metrics` enables metrics collection on all nodes. When specified, each client will activate its metrics endpoint according to its implementation. Metrics ports are configured per node in `validator-config.yaml`.
+7. `--deploymentMode` specifies the deployment mode: `local` or `ansible`. 
+   - If provided, this overrides the `deployment_mode` field in `validator-config.yaml`
+   - If not provided, the value from `validator-config.yaml` is used (defaults to `local` if not specified)
+   - **When set to `ansible`**: The script automatically uses `ansible-devnet/genesis/validator-config.yaml` and generates genesis files in `ansible-devnet/genesis/` (unless `--validatorConfig` is explicitly provided)
+   - Examples: `--deploymentMode local` or `--deploymentMode ansible`
+8. `--sshKey` or `--private-key` specifies the SSH private key file to use for remote Ansible deployments.
+   - Only used when `deployment_mode: ansible` is set
+   - Path to SSH private key file (e.g., `~/.ssh/id_rsa` or `/path/to/custom_key`)
+   - If not provided, Ansible will use the default SSH key (`~/.ssh/id_rsa`) or keys configured in `ansible.cfg`
+   - Example: `--sshKey ~/.ssh/custom_key` or `--private-key /path/to/key.pem`
+9. `--useRoot` flag specifies to use `root` user for remote Ansible deployments.
+   - Only used when `deployment_mode: ansible` is set
+   - If not specified, uses the current user (whoami) for SSH connections
+   - If specified, uses `root` user for SSH connections
+   - Example: `--useRoot` to connect as root user
+10. `--tag` specifies the Docker image tag to use for zeam, ream, qlean, and lantern containers.
+   - If provided, all clients will use this tag (e.g., `blockblaz/zeam:${tag}`, `ghcr.io/reamlabs/ream:${tag}`, `qdrvm/qlean-mini:${tag}`, `piertwo/lantern:${tag}`)
+   - If not provided, defaults to `latest` for zeam, ream, and lantern, and `dd67521` for qlean
+   - The script will automatically pull the specified Docker images before running containers
+   - Example: `--tag devnet0` or `--tag devnet1`
+12. `--metrics` enables metrics collection on all nodes. When specified, each client will activate its metrics endpoint according to its implementation. Metrics ports are configured per node in `validator-config.yaml`.
 
 ### Clients supported
 
@@ -93,12 +128,41 @@ Current following clients are supported:
 1. Zeam
 2. Ream
 3. Qlean
+4. Lantern
 
 However adding a lean client to this setup is very easy. Feel free to do the PR or reach out to the maintainers.
 
 ## How It Works
 
-The quickstart includes an automated genesis generator that eliminates the need for hardcoded files and uses `validator-config.yaml` as the source of truth. This file is to be contained in the `genesis` folder of the provided `NETWORK_DIR` folder you want to run quickstart on. Then post genesis generation, the quickstart spins the nodes as per their respective client cmds.
+The quickstart includes an automated genesis generator that eliminates the need for hardcoded files and uses `validator-config.yaml` as the source of truth. 
+
+**Configuration File Location:**
+- **Local deployments**: The `validator-config.yaml` file is contained in the `genesis` folder of the provided `NETWORK_DIR` folder (e.g., `local-devnet/genesis/validator-config.yaml`)
+- **Ansible deployments**: When `deployment_mode: ansible` is set (either in the config file or via `--deploymentMode ansible`), the script automatically uses `ansible-devnet/genesis/validator-config.yaml` instead. This keeps local and remote deployment configurations separate.
+
+Then post genesis generation, the quickstart spins the nodes as per their respective client cmds.
+
+### Directory Structure
+
+The quickstart uses separate directories for local and Ansible deployments:
+
+```
+lean-quickstart/
+├── local-devnet/              # Local development
+│   ├── genesis/
+│   │   └── validator-config.yaml  # Local IPs (127.0.0.1)
+│   └── data/                      # Node data directories
+│
+└── ansible-devnet/            # Ansible/remote deployment
+    ├── genesis/
+    │   └── validator-config.yaml  # Remote IPs (your server IPs)
+    └── data/                      # Node data directories
+```
+
+**Automatic Directory Selection:**
+- When `deployment_mode: ansible` is set (in config or via `--deploymentMode ansible`), the script automatically uses `ansible-devnet/genesis/validator-config.yaml`
+- This keeps local and remote configurations completely separate
+- Genesis files are generated in the appropriate directory based on deployment mode
 
 ### Configuration
 
@@ -300,14 +364,30 @@ Each hash-sig key has a **finite lifetime** of 2^32 signatures. The keys are str
 
 ### Key Rotation
 
-Hash-based signatures are **stateful** - each signature uses a unique one-time key from the tree. Once exhausted, keys must be rotated:
+Hash-based signatures are **stateful** - each signature uses a unique one-time key from the tree. Once exhausted, keys must be rotated.
 
+**Regenerating Keys:**
+
+You can regenerate hash-sig keys using either method:
+
+1. **Using `spin-node.sh` with `--forceKeyGen` flag** (recommended):
 ```sh
-# Regenerate all hash-sig keys
-./generate-genesis.sh local-devnet/genesis
+# Regenerate all hash-sig keys and genesis files
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --forceKeyGen
 ```
 
-**Warning**: Keep track of signature counts to avoid key exhaustion.
+2. **Using `generate-genesis.sh` directly**:
+```sh
+# Regenerate all hash-sig keys
+./generate-genesis.sh local-devnet/genesis --forceKeyGen
+```
+
+**Note**: The `--forceKeyGen` flag is required to overwrite existing keys. Without it, the generator will skip key generation if keys already exist.
+
+**Warning**: 
+- ⚠️ Regenerating keys will **overwrite** existing keys in `genesis/hash-sig-keys/`
+- ⚠️ Keep track of signature counts to avoid key exhaustion
+- ⚠️ Ensure you have backups of important keys before regenerating
 
 ### Key Security
 
@@ -358,6 +438,10 @@ Warning: Hash-sig public key not found at genesis/hash-sig-keys/validator_0_pk.j
 
 **Solution**: Run the genesis generator to create keys:
 ```sh
+# Using spin-node.sh (recommended)
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis
+
+# Or using generate-genesis.sh directly
 ./generate-genesis.sh local-devnet/genesis
 ```
 
@@ -370,7 +454,22 @@ Warning: Hash-sig secret key not found at genesis/hash-sig-keys/validator_5_sk.j
 
 **Solution**: This usually means you have more validators configured than hash-sig keys generated. Regenerate genesis files:
 ```sh
+# Using spin-node.sh (recommended)
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis
+
+# Or using generate-genesis.sh directly
 ./generate-genesis.sh local-devnet/genesis
+```
+
+**Problem**: Need to regenerate keys (e.g., after key exhaustion or configuration changes)
+
+**Solution**: Use the `--forceKeyGen` flag to force regeneration:
+```sh
+# Regenerate keys and all genesis files
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --forceKeyGen
+
+# Or using generate-genesis.sh directly
+./generate-genesis.sh local-devnet/genesis --forceKeyGen
 ```
 
 ## Automation Features
@@ -385,6 +484,297 @@ This quickstart includes automated configuration parsing:
 - **Error Handling**: Provides clear error messages when nodes or ports are not found
 
 The system reads all configuration from YAML files, making it easy to add new nodes or modify existing ones without changing any scripts.
+
+## Ansible Deployment
+
+The repository now includes Ansible-based deployment for enhanced automation, remote deployment capabilities, and better infrastructure management. Ansible provides idempotency, declarative configuration, and support for deploying to multiple remote hosts.
+
+📖 **For detailed Ansible documentation, see [ansible/README.md](ansible/README.md)**
+
+### Using Ansible Deployment
+
+**Recommended: Use `spin-node.sh` (Unified Entry Point)**
+
+`spin-node.sh` is the primary entry point for all deployments, including Ansible. Simply set `deployment_mode: ansible` in your `validator-config.yaml`:
+
+```sh
+# Set deployment_mode: ansible in validator-config.yaml, then:
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis
+```
+
+This automatically calls `run-ansible.sh` internally, which reads the default deployment mode from `ansible/inventory/group_vars/all.yml`.
+
+**Advanced: Direct Ansible Control with `ansible-deploy.sh`**
+
+For advanced Ansible workflows requiring direct control (e.g., `--playbook`, `--tags`, `--check`, `--diff`), you can use `ansible-deploy.sh` directly:
+
+```sh
+# First generate genesis files locally
+./generate-genesis.sh local-devnet/genesis
+
+# Then deploy nodes (genesis files are copied to remote hosts automatically)
+./ansible-deploy.sh --node zeam_0,ream_0 --network-dir local-devnet
+```
+
+However, for most use cases, `spin-node.sh` is recommended as it provides a consistent interface for both local and Ansible deployments.
+
+### Ansible Benefits
+
+- ✅ **Remote Deployment**: Deploy nodes to remote servers
+- ✅ **Idempotency**: Safe to run multiple times
+- ✅ **Infrastructure as Code**: Version-controlled deployment configuration
+- ✅ **Multi-Host Support**: Deploy to multiple hosts in parallel
+- ✅ **Better State Management**: Track and manage node lifecycle
+- ✅ **Extensible**: Easy to add new roles and playbooks
+
+### Installing Ansible
+
+**macOS:**
+```sh
+brew install ansible
+```
+
+**Ubuntu/Debian:**
+```sh
+sudo apt-get update
+sudo apt-get install ansible
+```
+
+**Using pip:**
+```sh
+pip install ansible
+```
+
+### Installing Ansible Dependencies
+
+Install required Ansible collections:
+
+```sh
+cd ansible
+ansible-galaxy install -r requirements.yml
+```
+
+### Quick Start with Ansible
+
+**Recommended: Using `spin-node.sh` (set `deployment_mode: ansible` in validator-config.yaml):**
+
+```sh
+# Deploy all nodes with genesis generation
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis
+
+# Deploy specific nodes
+NETWORK_DIR=local-devnet ./spin-node.sh --node zeam_0,ream_0 --generateGenesis
+
+# Deploy with clean data directories
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --cleanData
+```
+
+**Alternative: Using `ansible-deploy.sh` directly (for advanced Ansible options):**
+
+```sh
+# First generate genesis files locally
+./generate-genesis.sh local-devnet/genesis
+
+# Deploy specific nodes (genesis files are copied to remote hosts automatically)
+./ansible-deploy.sh --node zeam_0,ream_0 --network-dir local-devnet
+
+# Copy genesis files to remote hosts only
+./ansible-deploy.sh --playbook copy-genesis.yml --network-dir local-devnet
+
+# Dry run (check mode)
+./ansible-deploy.sh --node zeam_0,ream_0 --network-dir local-devnet --check
+```
+
+### Ansible Command-Line Options (Advanced)
+
+The following options are available when using `ansible-deploy.sh` directly for advanced Ansible workflows. For most use cases, use `spin-node.sh` instead (see [Quick Start with Ansible](#quick-start-with-ansible) above).
+
+The `ansible-deploy.sh` wrapper script provides the following options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--node NODES` | Nodes to deploy (single or comma/space-separated) | `--node zeam_0,ream_0` |
+| `--network-dir DIR` | Network directory | `--network-dir local-devnet` |
+| `--clean-data` | Clean data directories before deployment | `--clean-data` |
+| `--validator-config PATH` | Path to validator-config.yaml | `--validator-config custom/path.yaml` |
+| `--deployment-mode MODE` | Deployment mode: docker or binary | `--deployment-mode binary` |
+| `--playbook PLAYBOOK` | Ansible playbook to run | `--playbook copy-genesis.yml` |
+| `--tags TAGS` | Run only tasks with specific tags | `--tags zeam,genesis` |
+| `--check` | Dry run (check mode) | `--check` |
+| `--diff` | Show file changes | `--diff` |
+| `--verbose` | Verbose output | `--verbose` |
+
+### Ansible Directory Structure
+
+```
+ansible/
+├── ansible.cfg              # Ansible configuration
+├── requirements.yml          # Ansible Galaxy dependencies
+├── inventory/
+│   ├── hosts.yml            # Host inventory (localhost or remote hosts)
+│   └── group_vars/          # Group variables
+│       └── all.yml           # Global variables
+├── playbooks/
+│   ├── site.yml             # Main playbook (copy genesis + deploy)
+│   ├── copy-genesis.yml     # Copy genesis files to remote hosts
+│   ├── deploy-nodes.yml     # Node deployment playbook
+│   └── deploy-single-node.yml # Helper for single node deployment
+└── roles/
+    ├── common/              # Common setup (Docker, yq, directories)
+    ├── genesis/             # Genesis file generation
+    ├── zeam/                # Zeam node role
+    ├── ream/                # Ream node role
+    └── qlean/               # Qlean node role
+```
+
+### Remote Deployment
+
+The Ansible inventory is **automatically generated** from `validator-config.yaml`. 
+
+**Configuration Setup:**
+
+For Ansible deployments, create or update `ansible-devnet/genesis/validator-config.yaml` with your remote server IP addresses:
+
+```yaml
+deployment_mode: ansible
+config:
+  activeEpoch: 18
+  keyType: "hash-sig"
+validators:
+  - name: "zeam_0"
+    privkey: "..."
+    enrFields:
+      ip: "192.168.1.10"  # Remote IP address
+      quic: 9000
+    metricsPort: 8081
+    count: 1
+  - name: "ream_0"
+    privkey: "..."
+    enrFields:
+      ip: "192.168.1.11"  # Remote IP address
+      quic: 9001
+    metricsPort: 8082
+    count: 1
+```
+
+**Deployment:**
+
+Then use `spin-node.sh` with `--deploymentMode ansible` (or set `deployment_mode: ansible` in the config file):
+
+```sh
+# If using default SSH key (~/.ssh/id_rsa)
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --deploymentMode ansible
+
+# If using a custom SSH key and root user
+NETWORK_DIR=local-devnet ./spin-node.sh --node all --generateGenesis --deploymentMode ansible --sshKey ~/.ssh/custom_key --useRoot
+```
+
+> 💡 **Note**: When `deployment_mode: ansible` is set, the script automatically uses `ansible-devnet/genesis/validator-config.yaml` and generates all genesis files in `ansible-devnet/genesis/`. This keeps your local development (`local-devnet/`) and remote deployment (`ansible-devnet/`) configurations completely separate.
+
+The inventory generator will automatically:
+- Detect remote IPs (non-localhost) and configure remote connections
+- Group nodes by client type (zeam_nodes, ream_nodes, qlean_nodes, lantern_nodes)
+- Set appropriate connection parameters
+- Apply SSH key file if provided via `--sshKey` parameter
+
+**Note:** For remote deployment, ensure:
+- SSH key-based authentication is configured
+  - Use `--sshKey` parameter to specify custom SSH key: `--sshKey ~/.ssh/custom_key`
+  - Use `--useRoot` flag to connect as root user (defaults to current user)
+  - Or manually add `ansible_user` and `ansible_ssh_private_key_file` to the generated inventory
+  - Or configure in `ansible/ansible.cfg` (see `private_key_file` option)
+- Docker is installed on remote hosts (or use `deployment_mode: binary` in group_vars)
+- Required ports are open (QUIC ports, metrics ports)
+- Genesis files are accessible (copied or mounted)
+
+### Using Ansible Directly
+
+You can also run Ansible playbooks directly (after setting `deployment_mode: ansible` and running `spin-node.sh` once to generate the inventory):
+
+```sh
+cd ansible
+
+# Run main playbook
+ansible-playbook -i inventory/hosts.yml playbooks/site.yml \
+  -e "network_dir=$(pwd)/../local-devnet" \
+  -e "node_names=zeam_0,ream_0"
+
+# Copy genesis files to remote hosts only
+ansible-playbook -i inventory/hosts.yml playbooks/copy-genesis.yml \
+  -e "network_dir=$(pwd)/../local-devnet"
+
+# Run with specific tags
+ansible-playbook -i inventory/hosts.yml playbooks/deploy-nodes.yml \
+  -e "network_dir=$(pwd)/../local-devnet" \
+  -e "node_names=zeam_0" \
+  --tags zeam
+```
+
+### Ansible Variables
+
+Key variables can be set via command-line or in `ansible/inventory/group_vars/all.yml`:
+
+- `network_dir`: Network directory path (required)
+- `genesis_dir`: Genesis directory path (derived from network_dir)
+- `data_dir`: Data directory path (derived from network_dir)
+- `node_names`: Nodes to deploy (required, comma or space separated)
+- `clean_data`: Clean data directories (default: false)
+- `deployment_mode`: docker or binary (default: docker, defined in `ansible/inventory/group_vars/all.yml`)
+- `validator_config`: Validator config path (default: 'genesis_bootnode')
+
+**Note:** The default `deployment_mode` value is read from `ansible/inventory/group_vars/all.yml`. When using `spin-node.sh` with `deployment_mode: ansible`, it internally calls `run-ansible.sh` which reads this default value. You can override it by setting `deployment_mode` in your `validator-config.yaml` or via command-line arguments.
+
+### Comparing Local vs Ansible Deployment
+
+Both deployment modes use the same `spin-node.sh` entry point, controlled by `deployment_mode` in `validator-config.yaml`:
+
+| Feature | Local (`deployment_mode: local`) | Ansible (`deployment_mode: ansible`) |
+|---------|----------------------------------|--------------------------------------|
+| **Use Case** | Local development, quick setup | Production, remote deployment |
+| **Complexity** | Simple, direct | More structured |
+| **Remote Deployment** | No | Yes |
+| **Idempotency** | No | Yes |
+| **State Management** | Manual | Declarative |
+| **Multi-Host** | No | Yes |
+| **Rollback** | Manual | Built-in capabilities |
+| **Entry Point** | `spin-node.sh` | `spin-node.sh` (same command) |
+| **Inventory** | N/A | Auto-generated from validator-config.yaml |
+
+**Recommendation:** 
+- Use `deployment_mode: local` for local development and quick testing
+- Use `deployment_mode: ansible` for production deployments and remote hosts
+- Both modes use the same `spin-node.sh` command - just change the `deployment_mode` in `validator-config.yaml`
+
+## Deployment Modes
+
+The quickstart supports two deployment modes:
+
+| Mode | Use Case | Command |
+|------|----------|---------|
+| **Local** | Local development, quick testing | `deployment_mode: local` (default) |
+| **Ansible** | Production, remote deployment, infrastructure automation | `deployment_mode: ansible` |
+
+### Local Deployment Mode
+
+Local deployment uses shell scripts to directly run Docker containers or binaries on the local machine. This is the default mode and is ideal for:
+- Quick local development
+- Testing and experimentation
+- Single-machine setups
+
+### Ansible Deployment Mode
+
+Ansible deployment provides infrastructure automation and supports two sub-modes:
+
+| Sub-Mode | Use Case | Command |
+|----------|----------|---------|
+| **Docker** | Deploy containers directly on hosts | `--deployment-mode docker` (default for Ansible) |
+| **Binary** | Deploy binaries as systemd services | `--deployment-mode binary` |
+
+Ansible mode is ideal for:
+- Production deployments
+- Remote server management
+- Multi-host deployments
+- Infrastructure as Code workflows
 
 ## Client branches
 
