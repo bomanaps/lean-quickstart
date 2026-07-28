@@ -490,7 +490,7 @@ validators:                    # validator nodes specification
 The `spin-node.sh` triggers genesis generator (`generate-genesis.sh`) which generates the following files based on `validator-config.yaml`:
 
 1. **post-quantum secure validator keypairs** in `genesis/hash-sig-keys` unless already generated or forced with `--forceKeyGen`
-2. **config.yaml** - Updated genesis time, `ATTESTATION_COMMITTEE_COUNT`, and `GENESIS_VALIDATORS` with **attestation** and **proposal** public keys per validator (dual-key layout, 32-byte SSZ pubkeys / `hash-sig-cli:0.5.0`)
+2. **config.yaml** - Updated genesis time, `ATTESTATION_COMMITTEE_COUNT`, and `GENESIS_VALIDATORS` with **attestation** and **proposal** public keys per validator (dual-key layout, 32-byte SSZ pubkeys / `ghcr.io/lambdaclass/hash-sig-cli:0.5.0`)
 3. **validators.yaml** - Validator index assignments using round-robin distribution
 4. **nodes.yaml** - ENR (Ethereum Node Records) for peer discovery
 5. **genesis.json** - Genesis state in JSON format

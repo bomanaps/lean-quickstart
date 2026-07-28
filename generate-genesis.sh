@@ -346,8 +346,9 @@ if [ "$DUAL_KEY_MODE" = true ]; then
         echo "   ❌ Error: Could not read attester/proposer pubkeys from manifest"
         exit 1
     fi
+    # Whole bytes only, so the byte count derived below is exact rather than rounded.
     for pk in "$ATTEST_PUB" "$PROP_PUB"; do
-        if [[ ! "$pk" =~ ^0x[0-9a-fA-F]+$ ]]; then
+        if [[ ! "$pk" =~ ^0x([0-9a-fA-F]{2})+$ ]]; then
             echo "   ❌ Error: Manifest does not contain hex pubkeys (dual-key mode)"
             echo "   Found: $pk"
             exit 1
@@ -368,7 +369,13 @@ if [ "$DUAL_KEY_MODE" = true ]; then
         echo "   ⚠️  Manifest reports no 'pubkey_bytes' - these keys predate hash-sig-cli 0.5.0"
         echo "      and are in the retired leanSig format. Clients built against leanVM's XMSS"
         echo "      cannot read them; the genesis below will not start such a devnet."
-        echo "      Regenerate: ./generate-genesis.sh $GENESIS_DIR --forceKeyGen"
+        echo "      Regenerate: ./generate-genesis.sh \"$GENESIS_DIR\" --forceKeyGen"
+    elif [[ ! "$MANIFEST_PUBKEY_BYTES" =~ ^[0-9]+$ ]]; then
+        # Guard the arithmetic comparison below: a non-numeric value makes `[ -ne ]` fail
+        # as a condition, which would skip the check instead of reporting anything.
+        echo "   ❌ Error: manifest 'pubkey_bytes' is not a number: $MANIFEST_PUBKEY_BYTES"
+        echo "   The manifest is inconsistent - regenerate it rather than editing it by hand"
+        exit 1
     elif [ "$ATTEST_PUB_BYTES" -ne "$MANIFEST_PUBKEY_BYTES" ]; then
         echo "   ❌ Error: manifest declares pubkey_bytes=$MANIFEST_PUBKEY_BYTES but its pubkeys are $ATTEST_PUB_BYTES bytes"
         echo "   The manifest is inconsistent - regenerate it rather than editing it by hand"
