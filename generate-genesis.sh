@@ -168,7 +168,7 @@ fi
 echo "  ✅ docker found: $(which docker)"
 
 # Hash-sig-cli Docker image (separate attester + proposer keys per validator when using dual-key manifest)
-HASH_SIG_CLI_IMAGE="blockblaz/hash-sig-cli:latest"
+HASH_SIG_CLI_IMAGE="ghcr.io/lambdaclass/hash-sig-cli:0.5.0"
 echo "  ✅ Using hash-sig-cli Docker image: $HASH_SIG_CLI_IMAGE"
 
 echo ""
@@ -263,14 +263,13 @@ if [ "$SHOULD_SKIP" == "true" ]; then
     echo ""
 else
     echo "   Generating keys for $VALIDATOR_COUNT validators..."
-    echo "   Using scheme: SIGTopLevelTargetSumLifetime32Dim64Base8"
     echo "   Key directory: $HASH_SIG_KEYS_DIR"
     echo ""
 
-    # Generate hash-sig keys for all validators using Docker
-    # Scheme: SIGTopLevelTargetSumLifetime32Dim64Base8
+    # Generate hash-sig keys for all validators using Docker.
+    # The signature scheme is whatever the pinned image was built against; it is
+    # reported back in validator-keys-manifest.yaml rather than assumed here.
     # Active epochs: 2^ACTIVE_EPOCH (from validator-config.yaml)
-    # Total lifetime: 2^32 (4,294,967,296)
     # Convert to absolute path for Docker volume mounting
     GENESIS_DIR_ABS="$(cd "$GENESIS_DIR" && pwd)"
 
@@ -355,6 +354,26 @@ if [ "$DUAL_KEY_MODE" = true ]; then
         fi
     done
     echo "   ✅ Manifest verified - dual-key format (attester + proposer)"
+
+    # Cross-check the pubkey length the manifest declares against the pubkeys it holds.
+    # Key file names did not change when the format moved to leanVM's XMSS, so a key
+    # directory left over from an older image passes the "keys already exist" check
+    # above and would otherwise be baked into config.yaml unnoticed.
+    MANIFEST_KEY_SCHEME=$(yq eval '.key_scheme // ""' "$MANIFEST_FILE" 2>/dev/null)
+    MANIFEST_PUBKEY_BYTES=$(yq eval '.pubkey_bytes // ""' "$MANIFEST_FILE" 2>/dev/null)
+    ATTEST_PUB_BYTES=$(( (${#ATTEST_PUB} - 2) / 2 ))
+    echo "   Key scheme: ${MANIFEST_KEY_SCHEME:-<unreported>}"
+    echo "   Public key size: ${ATTEST_PUB_BYTES} bytes"
+    if [ -z "$MANIFEST_PUBKEY_BYTES" ]; then
+        echo "   ⚠️  Manifest reports no 'pubkey_bytes' - these keys predate hash-sig-cli 0.5.0"
+        echo "      and are in the retired leanSig format. Clients built against leanVM's XMSS"
+        echo "      cannot read them; the genesis below will not start such a devnet."
+        echo "      Regenerate: ./generate-genesis.sh $GENESIS_DIR --forceKeyGen"
+    elif [ "$ATTEST_PUB_BYTES" -ne "$MANIFEST_PUBKEY_BYTES" ]; then
+        echo "   ❌ Error: manifest declares pubkey_bytes=$MANIFEST_PUBKEY_BYTES but its pubkeys are $ATTEST_PUB_BYTES bytes"
+        echo "   The manifest is inconsistent - regenerate it rather than editing it by hand"
+        exit 1
+    fi
 else
     FIRST_PUBKEY=$(yq eval ".validators[0].$PUBKEY_FIELD" "$MANIFEST_FILE" 2>/dev/null)
     if [ -z "$FIRST_PUBKEY" ]; then
