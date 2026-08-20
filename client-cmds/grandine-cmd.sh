@@ -27,13 +27,14 @@ if [ -n "${checkpoint_sync_url:-}" ]; then
     checkpoint_sync_flag="--checkpoint-sync-url $checkpoint_sync_url"
 fi
 
-node_binary="$grandine_bin \
+node_binary="/Users/mercynaps/api/lean/lean_client/target/release/lean_client \
         --genesis $configDir/config.yaml \
         --validator-registry-path $configDir/annotated_validators.yaml \
         --bootnodes $configDir/nodes.yaml \
         --node-id $item \
         --node-key $configDir/$privKeyPath \
         --port $quicPort \
+        --discovery-port $((quicPort + 1)) \
         --address 0.0.0.0 \
         --http-address 0.0.0.0 \
         --http-port $apiPort \
@@ -46,13 +47,14 @@ node_binary="$grandine_bin \
         $aggregate_subnet_ids_flag \
         $checkpoint_sync_flag"
 
-node_docker="sifrai/lean:devnet-4 \
+node_docker="bomanaps/lean:devnet-5-leanvm \
         --genesis /config/config.yaml \
         --validator-registry-path /config/annotated_validators.yaml \
         --bootnodes /config/nodes.yaml \
         --node-id $item \
         --node-key /config/$privKeyPath \
         --port $quicPort \
+        --discovery-port $((quicPort + 1)) \
         --address 0.0.0.0 \
         --http-address 0.0.0.0 \
         --http-port $apiPort \

@@ -7,64 +7,6 @@ config:
   # Optional; omit for default 1 (leanSpec src/lean_spec/subspecs/chain/config.py)
   attestation_committee_count: 1
 validators:
-  - name: "zeam_0"
-    privkey: "bdf953adc161873ba026330c56450453f582e3c4ee6cb713644794bcfdd85fe5"
-    enrFields:
-      # verify /ip4/127.0.0.1/udp/9001/quic-v1/p2p/16Uiu2HAkvi2sxT75Bpq1c7yV2FjnSQJJ432d6jeshbmfdJss1i6f
-      ip: "127.0.0.1"
-      quic: 9001
-    metricsPort: 8081
-    apiPort: 5051
-    isAggregator: false
-    count: 1
-  - name: "ream_0"
-    privkey: "af27950128b49cda7e7bc9fcb7b0270f7a3945aa7543326f3bfdbd57d2a97a32"
-    enrFields:
-      #verify /ip4/127.0.0.1/udp/9002/quic-v1/p2p/16Uiu2HAmPQhkD6Zg5Co2ee8ShshkiY4tDePKFARPpCS2oKSLj1E1
-      ip: "127.0.0.1"
-      quic: 9002
-    metricsPort: 8082
-    apiPort: 5052
-    isAggregator: false
-    count: 1
-  - name: "qlean_0"
-    # node id f0af4dcd8864372ca01ae984b9a386f86e5cb582331394db3434fea59ad78bde
-    # peer id 16Uiu2HAmQj1RDNAxopeeeCFPRr3zhJYmH6DEPHYKmxLViLahWcFE
-    privkey: "c2bbdac5e876b3e9d4b8b6b8c2bbdac5e876b3e9d4b8b6b8c2bbdac5e876b3e9"
-    enrFields:
-      #verify /ip4/127.0.0.1/udp/9003/quic-v1/p2p/16Uiu2HAmQj1RDNAxopeeeCFPRr3zhJYmH6DEPHYKmxLViLahWcFE
-      ip: "127.0.0.1"
-      quic: 9003
-    metricsPort: 8083
-    apiPort: 5053
-    isAggregator: false
-    count: 1
-  - name: "lantern_0"
-    # node id 974c5fd0a680f5e576189123d5808cefd6c748c75effde28c5c3aacbb8d4c652
-    # peer id 16Uiu2HAm7TYVs6qvDKnrovd9m4vvRikc4HPXm1WyLumKSe5fHxBv
-    privkey: "d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5"
-    enrFields:
-      ip: "127.0.0.1"
-      quic: 9004
-    metricsPort: 8084
-    httpPort: 5054
-    apiPort: 5054
-    isAggregator: false
-    count: 1
-
-  - name: "lighthouse_0"
-    # node id af7df69e602552d2ba639e09ca87107b1bc315306ed434aa86c8515dcad0a252
-    # peer id 16Uiu2HAmTrYwvBDY3GLEv5zR48ZfBwCYyKgmuLTDsCdBJUo127HY
-    privkey: "4fd22cf461fbeae4947a3fdaef8d533fc7fd1ef1ce4cd98e993210c18234df3f"
-    # verify /ip4/127.0.0.1/udp/9005/quic-v1/p2p/16Uiu2HAmTrYwvBDY3GLEv5zR48ZfBwCYyKgmuLTDsCdBJUo127HY
-    enrFields:
-      ip: "127.0.0.1"
-      quic: 9005
-    metricsPort: 8085
-    apiPort: 5055
-    isAggregator: false
-    count: 1
-
   - name: "grandine_0"
     # node id f9e3dfd0eb2e8fb7dfb072b91b23e3286c0fae245cd2c732f4752577f32e5782
     # peer id 16Uiu2HAmErASHzouSQumaetyU18brt4HNUm4151K55ySBQMRLzSS
@@ -74,10 +16,18 @@ validators:
       ip: "127.0.0.1"
       quic: 9006
     metricsPort: 8086
-    apiPort: 8086
+    apiPort: 5056
+    isAggregator: true
+    count: 1
+  - name: "grandine_1"
+    privkey: "bdf953adc161873ba026330c56450453f582e3c4ee6cb713644794bcfdd85fe5"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9008
+    metricsPort: 8088
+    apiPort: 5057
     isAggregator: false
     count: 1
-
   - name: "ethlambda_0"
     # node id 86cec93353ffcc6f38c9c15becadcb30d1acab21a92b30418110c980a38d9c3d
     # peer id 16Uiu2HAmPV5jU62WtmDkCEmfq1jzbBDkGbHNsDN78gJyvmv2TuC5
@@ -87,22 +37,11 @@ validators:
       ip: "127.0.0.1"
       quic: 9007
     metricsPort: 8087
-    apiPort: 8087
-    isAggregator: false
-    count: 1
-
-  - name: "gean_0"
-    privkey: "5e4f4cd02d1c06f715e02ca9939e22ecbca063ad188e080cda4f0786f50367a0"
-    enrFields:
-      ip: "127.0.0.1"
-      quic: 9008
-    metricsPort: 8088
     apiPort: 5058
     isAggregator: false
     count: 1
-
-  - name: "peam_0"
-    privkey: "8c7b62f4c4a35d134649817f44d2839ad15bcfa1fe6b87991f64d6f54f3ef2a1"
+  - name: "grandine_2"
+    privkey: "595cd631298140a0f37c6b6bc4189bd105d5f34afc901703ab232c2f09b51b04"
     enrFields:
       ip: "127.0.0.1"
       quic: 9009
@@ -110,13 +49,57 @@ validators:
     apiPort: 5059
     isAggregator: false
     count: 1
-
-  - name: "nlean_0"
-    privkey: "2e9be3f1b0d32ca3a4d62017fbfafe3950b7e90fed6802ff8bd2e0f8c4e2ca91"
+  - name: "grandine_3"
+    privkey: "76901358d797b696c5909ea4930eecc9ddfe27c775cce9831c60bee629eae08c"
     enrFields:
       ip: "127.0.0.1"
       quic: 9010
     metricsPort: 8090
     apiPort: 5060
+    isAggregator: false
+    count: 1
+  - name: "ethlambda_1"
+    privkey: "8571a271d73ba2e77625a5b82e298a8d4d94b1e6c4d2fe073c4209b83a8fbc13"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9011
+    metricsPort: 8091
+    apiPort: 5061
+    isAggregator: false
+    count: 1
+  - name: "ethlambda_2"
+    privkey: "678aa31eb504201ae118db966c0e3e25535ccd486973631d951b0927e14c2769"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9012
+    metricsPort: 8092
+    apiPort: 5062
+    isAggregator: false
+    count: 1
+  - name: "lantern_0"
+    privkey: "837ff529bbced902cef1948246978daf2065a784fa8bfc67a166f2d00eacfce8"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9013
+    metricsPort: 8093
+    apiPort: 5063
+    isAggregator: false
+    count: 1
+  - name: "lantern_1"
+    privkey: "533c974796aa3ebc5e05ea8ba1d216f45b556d608720753841e914a7b3f902cf"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9014
+    metricsPort: 8094
+    apiPort: 5064
+    isAggregator: false
+    count: 1
+  - name: "lantern_2"
+    privkey: "f3e257d6edbedb51b848f7a88554897e5f7ce140ea420f56e9032dbc41132b0e"
+    enrFields:
+      ip: "127.0.0.1"
+      quic: 9015
+    metricsPort: 8095
+    apiPort: 5065
     isAggregator: false
     count: 1

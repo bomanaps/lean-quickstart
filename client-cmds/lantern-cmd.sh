@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #-----------------------lantern setup----------------------
-LANTERN_IMAGE="bitminemavan/lantern:v0.0.4"
+LANTERN_IMAGE="bitminemavan/lantern@sha256:6577bdcfd7560138dfc525fcdd172888e3a46c87cedc4d2aa40cbc8ac01fce46"
 
 devnet_flag=""
 if [ -n "$devnet" ]; then
